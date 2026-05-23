@@ -1,0 +1,11 @@
+*.md
+!README.md
+.claude/
+.agents/
+.vscode/
+build/
+plan/
+samples/
+*.o
+*.obj
+third_party/stb/*

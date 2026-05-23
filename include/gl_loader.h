@@ -1,0 +1,83 @@
+#ifndef VIDEO_PROCESSING_GL_LOADER_H
+#define VIDEO_PROCESSING_GL_LOADER_H
+
+#include <stdbool.h>
+#include <stddef.h>
+
+#include <SDL2/SDL_opengl.h>
+#include <SDL2/SDL_opengl_glext.h>
+
+extern PFNGLCREATESHADERPROC pglCreateShader;
+#define glCreateShader pglCreateShader
+extern PFNGLSHADERSOURCEPROC pglShaderSource;
+#define glShaderSource pglShaderSource
+extern PFNGLCOMPILESHADERPROC pglCompileShader;
+#define glCompileShader pglCompileShader
+extern PFNGLGETSHADERIVPROC pglGetShaderiv;
+#define glGetShaderiv pglGetShaderiv
+extern PFNGLGETSHADERINFOLOGPROC pglGetShaderInfoLog;
+#define glGetShaderInfoLog pglGetShaderInfoLog
+extern PFNGLDELETESHADERPROC pglDeleteShader;
+#define glDeleteShader pglDeleteShader
+extern PFNGLCREATEPROGRAMPROC pglCreateProgram;
+#define glCreateProgram pglCreateProgram
+extern PFNGLATTACHSHADERPROC pglAttachShader;
+#define glAttachShader pglAttachShader
+extern PFNGLLINKPROGRAMPROC pglLinkProgram;
+#define glLinkProgram pglLinkProgram
+extern PFNGLGETPROGRAMIVPROC pglGetProgramiv;
+#define glGetProgramiv pglGetProgramiv
+extern PFNGLGETPROGRAMINFOLOGPROC pglGetProgramInfoLog;
+#define glGetProgramInfoLog pglGetProgramInfoLog
+extern PFNGLDELETEPROGRAMPROC pglDeleteProgram;
+#define glDeleteProgram pglDeleteProgram
+extern PFNGLUSEPROGRAMPROC pglUseProgram;
+#define glUseProgram pglUseProgram
+
+extern PFNGLGETUNIFORMLOCATIONPROC pglGetUniformLocation;
+#define glGetUniformLocation pglGetUniformLocation
+extern PFNGLUNIFORM1IPROC pglUniform1i;
+#define glUniform1i pglUniform1i
+extern PFNGLUNIFORM2FPROC pglUniform2f;
+#define glUniform2f pglUniform2f
+
+extern PFNGLGENVERTEXARRAYSPROC pglGenVertexArrays;
+#define glGenVertexArrays pglGenVertexArrays
+extern PFNGLBINDVERTEXARRAYPROC pglBindVertexArray;
+#define glBindVertexArray pglBindVertexArray
+extern PFNGLDELETEVERTEXARRAYSPROC pglDeleteVertexArrays;
+#define glDeleteVertexArrays pglDeleteVertexArrays
+extern PFNGLGENBUFFERSPROC pglGenBuffers;
+#define glGenBuffers pglGenBuffers
+extern PFNGLBINDBUFFERPROC pglBindBuffer;
+#define glBindBuffer pglBindBuffer
+extern PFNGLBUFFERDATAPROC pglBufferData;
+#define glBufferData pglBufferData
+extern PFNGLDELETEBUFFERSPROC pglDeleteBuffers;
+#define glDeleteBuffers pglDeleteBuffers
+extern PFNGLVERTEXATTRIBPOINTERPROC pglVertexAttribPointer;
+#define glVertexAttribPointer pglVertexAttribPointer
+extern PFNGLENABLEVERTEXATTRIBARRAYPROC pglEnableVertexAttribArray;
+#define glEnableVertexAttribArray pglEnableVertexAttribArray
+
+extern PFNGLACTIVETEXTUREPROC pglActiveTexture;
+#define glActiveTexture pglActiveTexture
+
+extern PFNGLGENFRAMEBUFFERSPROC pglGenFramebuffers;
+#define glGenFramebuffers pglGenFramebuffers
+extern PFNGLDELETEFRAMEBUFFERSPROC pglDeleteFramebuffers;
+#define glDeleteFramebuffers pglDeleteFramebuffers
+extern PFNGLBINDFRAMEBUFFERPROC pglBindFramebuffer;
+#define glBindFramebuffer pglBindFramebuffer
+extern PFNGLFRAMEBUFFERTEXTURE2DPROC pglFramebufferTexture2D;
+#define glFramebufferTexture2D pglFramebufferTexture2D
+extern PFNGLCHECKFRAMEBUFFERSTATUSPROC pglCheckFramebufferStatus;
+#define glCheckFramebufferStatus pglCheckFramebufferStatus
+
+extern PFNGLUNIFORM1FPROC pglUniform1f;
+#define glUniform1f pglUniform1f
+
+bool gl_load_all(char *err_buf, size_t err_buf_len);
+void gl_check_error(const char *tag);
+
+#endif
