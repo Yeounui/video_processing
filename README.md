@@ -45,7 +45,7 @@ SDL2, OpenGL 3.3 Core Profile, FFmpeg, stb를 사용한 C99 기반 이미지/비
 
 ## 라이선스
 
-작성된 소스 코드는 MIT License로 공개됩니다. 저장소 루트의 `LICENSE`를 확인하세요.
+작성된 소스 코드는 MIT License로 공개됩니다.
 
 외부 라이브러리는 각 프로젝트의 라이선스를 따르며, 이 저장소는 해당 라이브러리의 소스나 바이너리를 포함하지 않습니다. stb 헤더는 이 저장소에 포함하지 않으며, 빌드 전 `https://github.com/nothings/stb`에서 내려받아 사용합니다.
 
