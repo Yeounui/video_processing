@@ -5,7 +5,7 @@ project(qt_ui LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-find_package(Qt6 REQUIRED COMPONENTS Core Gui Qml Quick QuickControls2 OpenGL)
+find_package(Qt6 REQUIRED COMPONENTS Core Gui Qml Quick QuickControls2)
 
 qt_standard_project_setup()
 
@@ -42,5 +42,4 @@ target_link_libraries(qt_ui
         Qt6::Qml
         Qt6::Quick
         Qt6::QuickControls2
-        Qt6::OpenGL
 )
