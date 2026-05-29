@@ -18,10 +18,17 @@ Minimize this file. Default to handling work autonomously. Escalate only when th
 
 ## Constraints Worth Recording (fill in when known)
 
+- [x] WSL2 environment: kernel rebuilt to enable WSLg (Wayland) support. App runs via Wayland + software backend on WSLg; XCB fallback on standard Linux/X11.
 - [ ] Qt6 install path / CMake prefix — user to record once confirmed.
 - [ ] FFmpeg version and library path — user to record once confirmed.
 - [ ] Target OpenGL version supported by the dev machine (baseline is 3.3 Core).
 - [ ] GPU/driver constraints affecting GLSL parity testing.
+
+## Platform Environment
+
+- **WSL2 (WSLg mode)**: `applyWslgRuntimeFix()` automatically detects Wayland and patches `XDG_RUNTIME_DIR` if needed. `QT_QPA_PLATFORM` and `QT_QUICK_BACKEND` are set automatically; no manual env var configuration required.
+- **Standard Linux**: app defaults to XCB with standard OpenGL backend.
+- Manual env var override: `QT_QPA_PLATFORM` or `QT_QUICK_BACKEND` can still be set by the user to override auto-detection if needed.
 
 ## Role Split
 

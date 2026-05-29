@@ -52,25 +52,7 @@ Claude may write code directly only when direct editing is expected to use fewer
 
 ## Agent Handoff Packet
 
-When invoking an agent, provide the fields relevant to that agent:
-
-| Field | Applies To | Content |
-|-------|------------|---------|
-| User Request | all | Original user goal or narrowed task |
-| Agent Role | all | Why this agent is being called now |
-| Relevant Extracts | all | `plan-coordinator` output or exact source facts |
-| Target Scope | all | Files, symbols, phase, or documents in scope |
-| Out of Scope | all | What must not be changed, judged, or expanded |
-| Success Criteria | all | Expected behavior, status update, review target, or answer shape |
-| Expected Output | all | Report, patch result, status update, findings, or answer |
-| Implementation Blueprint | `codex-writer-*` | Behavior contract, architecture constraints, and preferred verification commands |
-| Verification Evidence | `code-reviewer`, `plan-coordinator` | Commands run, results, or evidence still missing |
-| Review Contract | `code-reviewer` | User request, blueprint, writer report, plan extract, or verification result to review against |
-| Review Scope | `code-reviewer` | File paths, diff range, or changed files to inspect |
-| Mode | `plan-coordinator` | `retrieve`, `update`, or `audit` |
-| Question or Change | `plan-coordinator` | Narrow retrieval question, explicit plan change, or audit target |
-| Sources/Destinations | `plan-coordinator` | Relevant source files, canonical destination files, or audit scope |
-| Target Status | `plan-coordinator` status updates | Intended status term and the evidence supporting it |
+When invoking an agent, follow `.claude/rules/Handoff_Packet.md` for required fields and per-mode query templates.
 
 ## Prompt Cache Policy
 
@@ -78,19 +60,7 @@ Keep this file as a lightweight router. Do not duplicate canonical plan facts, r
 
 Main Model may read `plan/README.md` directly as the status and document-map entry point. Do not directly read any other `plan/*.md` file, `plan.md`, or `structure.md`; request the needed facts through `plan-coordinator`. If `plan/README.md` does not exist, use the `init-plan` skill.
 
-Use this compact map to route targeted questions through `plan-coordinator`:
-
-| Information | Canonical Location |
-|-------------|--------------------|
-| Project goal and scope | `plan/OVERVIEW.md` |
-| Current status and document map | `plan/README.md` |
-| Decision history | `plan/DECISIONS.md` |
-| Work phases and procedure | `plan/PHASES.md` |
-| Code structure and architecture | `plan/ARCHITECTURE.md` |
-| Review, QA, fallback | `plan/REVIEW.md` |
-| User-run tasks and local constraints | `plan/USER.md` |
-| Executable scripts | `scripts/` |
-| Reference code and templates | `snippets/` |
+Canonical document placement is defined in `.claude/rules/Edit_Workflow.md`.
 
 ## Required Reading On New Sessions
 

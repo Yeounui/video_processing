@@ -6,14 +6,15 @@ Canonical architecture document. Detailed algorithm formulae and module narrativ
 
 - Language: C++17 (Qt/QML backend), QML (UI), C99-compatible interfaces (processing core).
 - UI framework: Qt Quick / QML + Qt Quick Controls.
-- OpenGL host: Qt Quick scene graph OpenGL backend; QML-visible `QSGRenderNode` viewport item.
+- OpenGL host: Qt Quick scene graph OpenGL backend (auto-selected by QT_QPA_PLATFORM and QT_QUICK_BACKEND); QML-visible `QSGRenderNode` viewport item.
+- Platform selection: WSLg-aware (Wayland + software backend auto-detected via `/mnt/wslg/runtime-dir/`); standard XCB fallback on non-WSLg displays.
 - Video decode: FFmpeg (`avformat`, `avcodec`, `avutil`, `swscale`, `avdevice`).
 - Static image IO: Qt image IO.
 - Build system: CMake.
 
-Required link targets: Qt6 Core, Qt6 Gui, Qt6 Qml, Qt6 Quick, Qt6 QuickControls2, Qt6 OpenGL, OpenGL, FFmpeg components above, math library when platform requires.
+Required link targets: Qt6 Core, Qt6 Gui, Qt6 Qml, Qt6 Quick, Qt6 QuickControls2, OpenGL, FFmpeg components above, math library when platform requires.
 
-Removed dependencies: SDL2, Qt Widgets shell, PPM parser/saver, STB headers as required IO.
+Removed dependencies: SDL2, Qt Widgets shell, PPM parser/saver, STB headers as required IO, explicit Qt6::OpenGL (Qt Quick manages OpenGL internally).
 
 Implementation restrictions: no `GL_LINEAR`/mipmap/external resize substitution for algorithm or display resampling; algorithm formulae live in CPU code or GLSL only; Qt image IO is decode/encode only.
 
@@ -280,7 +281,7 @@ Video / realtime: FFmpeg source → RGB frame into `inImage` → processor appli
 
 ## Object Lifecycle
 
-Startup: create `QGuiApplication` → configure Qt Quick OpenGL backend → load QML `ApplicationWindow` → create `ProcessingController` → create QML `ProcessingViewport` → create scene graph `QSGRenderNode` → initialize `ProcessingViewport` and `GpuEffectPipeline` GL resources when render context is current.
+Startup: call `applyWslgRuntimeFix()` to detect and patch WSLg environment → set `QT_QPA_PLATFORM` and `QT_QUICK_BACKEND` for auto platform selection → create `QGuiApplication` → load QML `ApplicationWindow` → create `ProcessingController` → create QML `ProcessingViewport` → create scene graph `QSGRenderNode` → initialize `ProcessingViewport` and `GpuEffectPipeline` GL resources when render context is current → call `window->showNormal()`, `window->raise()`, `window->requestActivate()` with 100ms retry timer for WSLg startup timing.
 
 Runtime: user actions enter `QmlShell` → state-changing commands route through `ProcessingController` → rendering goes to `ProcessingViewport` → GLSL effects through `GpuEffectPipeline` → video/stream frame updates run on Qt timer/thread scheduling.
 

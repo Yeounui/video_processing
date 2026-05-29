@@ -68,11 +68,12 @@ Irreversible or high-impact technical choices. Use `plan-coordinator` to append 
 - Rationale: A non-OpenGL interactive viewport is out of scope.
 - Source: `structure.md` § GPU Fallback Policy.
 
-## D12 — OpenGL RHI backend forced
+## D12 — OpenGL RHI backend forced (superseded by D40)
 
 - Decision: In `main.cpp` before `QQmlApplicationEngine` construction, call `QQuickWindow::setGraphicsApi(QSGRendererInterface::OpenGL)`. Also set environment variable `QSG_RHI_BACKEND=opengl` as belt-and-suspenders.
 - Rationale: Qt6 default RHI backend is platform-dependent (Vulkan/Metal/D3D12); `QSGRenderNode` uses raw OpenGL requiring context guarantee.
 - Source: Issue 1 resolution; `structure.md` § Build And Runtime Baseline.
+- Status: Replaced by D40 (WSLg auto-detection and environment-driven backend selection).
 
 ## D13 — QSGRenderNode GL bracketing: beginExternalCommands / endExternalCommands
 
@@ -260,3 +261,19 @@ Irreversible or high-impact technical choices. Use `plan-coordinator` to append 
 - Decision: `ImageProcessorCore::apply(int algorithmId, ImageBuffer& dst, const ImageBuffer& src, const EffectParams& params)`는 `switch(algorithmId)` (case 1..28)로 구현 알고리즘을 선택한다. GpuEffectPipeline의 GLSL dispatch도 동일하게 `switch(algorithmId)`로 셰이더를 선택한다. `AlgorithmSpec`은 순수 데이터 구조체(id, name, category, 파라미터 스키마, 백엔드 지원 플래그)로 유지하며 function pointer를 포함하지 않는다.
 - Rationale: 가장 단순하고 디버깅이 용이한 구현. AlgorithmSpec이 선언적 메타데이터 역할만 유지.
 - Source: P2 #10 resolution; D8; ARCHITECTURE.md Algorithm Catalog.
+
+## D40 — WSLg auto-detection and environment-driven platform selection
+
+- Decision:
+  1. Remove forced OpenGL backend (`QQuickWindow::setGraphicsApi(QSGRendererInterface::OpenGL)` and `QSG_RHI_BACKEND=opengl`).
+  2. Implement `applyWslgRuntimeFix()` function called before `QGuiApplication` construction: reads `WAYLAND_DISPLAY` env var; if set, checks for Wayland socket in `XDG_RUNTIME_DIR`; if missing, checks `/mnt/wslg/runtime-dir/` and patches `XDG_RUNTIME_DIR` if socket found there.
+  3. Set `QT_QPA_PLATFORM=wayland` (if not already set) and `QT_QUICK_BACKEND=software` (if not already set) before QGuiApplication.
+  4. After QML engine loads, explicitly call `window->showNormal()`, `window->raise()`, `window->requestActivate()`, then repeat via 100ms `QTimer::singleShot` to work around WSLg startup timing issues.
+  5. Remove explicit `Qt6::OpenGL` link dependency; Qt Quick manages OpenGL internally.
+- Rationale: 
+  - WSL2 kernel rebuild enables stable Wayland support; hard-coded OpenGL was fragile and tied to XCB.
+  - WSLg socket detection via `/mnt/wslg/runtime-dir/` and XDG_RUNTIME_DIR patching allows automatic platform selection without manual env var setup.
+  - Software backend + Wayland yields stable window visibility on WSLg.
+  - Window raise/activate retry handles timing edge cases in WSLg startup.
+  - Qt Quick handles OpenGL context internally when needed; explicit Qt6::OpenGL linking is unnecessary.
+- Source: Commit 91b60a2 (Fix Qt Quick startup under WSLg); Phase 2 completion test results on WSL2 + rebuilt kernel.

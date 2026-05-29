@@ -45,6 +45,8 @@ Expect the Main Model to provide:
 | **Evidence** | User request, Main Model decision, implementation result, verification command/result, or review finding |
 | **Expected Output** | Dense facts, changed files/report, audit findings, skipped update, or missing evidence |
 
+One mode per call. Do not combine `retrieve` + `update` or `update` + `audit` in a single message.
+
 If the prompt lacks evidence needed for a requested update, report the missing evidence instead of guessing.
 
 ## Canonical Documents
@@ -137,6 +139,8 @@ Checks:
 5. **Decision log:** When scope, phase procedure, architecture, or decision history changes, ensure `plan/DECISIONS.md` records the decision. If git is available and useful, `git log --oneline -10` may help identify recent decision-bearing changes.
 
 ## Report Back
+
+Always send a response. Never complete work silently — if files were updated, send a confirmation. If no update was needed, say why.
 
 For retrieval, report only the requested facts.
 

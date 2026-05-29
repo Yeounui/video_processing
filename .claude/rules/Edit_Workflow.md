@@ -6,15 +6,11 @@ paths:
 
 ## When To Use
 
-- writing or changing code
-- reviewing code
-- refactoring
-- changing Markdown planning documents
+- creating or modifying `plan/` documents
+- changing canonical document structure or placement
 - moving or deleting files
-- creating scripts, snippets, tests, or project structure
-- debugging ambiguous behavior
 
-For trivial typo fixes, obvious one-line edits, or quick read-only lookups, apply only the relevant parts.
+For trivial plan edits, apply only the relevant parts.
 
 ## Startup Routine
 
