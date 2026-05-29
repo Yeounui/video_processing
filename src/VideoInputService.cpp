@@ -479,7 +479,9 @@ std::shared_ptr<ImageBuffer> VideoInputService::toImageBuffer(AVFrame *f)
 
     sws_scale(swsCtx_, f->data, f->linesize, 0, h, dst, dstStride);
 
-    if (fmtCtx_ && videoStreamIdx_ >= 0) {
+    // Skip timestamp update in stream mode: currentTimeSecs_ is GUI-thread state,
+    // and toImageBuffer() is called from the producer thread in stream mode.
+    if (!isStream_ && fmtCtx_ && videoStreamIdx_ >= 0) {
         AVStream *stream = fmtCtx_->streams[videoStreamIdx_];
         int64_t best_effort_ts = f->best_effort_timestamp;
         if (best_effort_ts != AV_NOPTS_VALUE) {
