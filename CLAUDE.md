@@ -22,7 +22,7 @@ For routine tasks, use the agent pipelines below to optimize token efficiency an
 
 **Agent Lifecycle**
 
-- `plan-coordinator`: Persistent team member. Spawn once per session via `TeamCreate` + `Agent(team_name=..., name="plan-coordinator")`; communicate throughout the session via `SendMessage(to: "plan-coordinator", ...)`. Goes idle between turns but does not terminate.
+- `plan-coordinator`: Persistent team member. **Spawn exactly one per session** via `TeamCreate` + `Agent(team_name=..., name="plan-coordinator")`; communicate throughout the session via `SendMessage(to: "plan-coordinator", ...)`. Goes idle between turns but does not terminate. Before spawning, check `~/.claude/teams/qt-ui/config.json` — if a member named `plan-coordinator` already exists, use `SendMessage` instead of spawning again.
 - `codex-writer-small`, `codex-writer-large`, `code-reviewer`: Regular subagents. Spawn per task via `Agent`; terminate automatically after returning results.
 
 **Task Allocation And Prompt Cache Routing**

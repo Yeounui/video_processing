@@ -23,6 +23,14 @@ Rectangle {
         onAccepted: ProcessingController.saveImage(selectedFile)
     }
 
+    FileDialog {
+        id: openVideoDialog
+        title: "Open Video"
+        nameFilters: ["Video files (*.mp4 *.avi *.mov *.mkv *.wmv *.flv *.webm *.m4v)", "All files (*)"]
+        fileMode: FileDialog.OpenFile
+        onAccepted: ProcessingController.openVideo(selectedFile)
+    }
+
     RowLayout {
         anchors {
             fill: parent
@@ -54,16 +62,14 @@ Rectangle {
             Button {
                 text: "Open Video"
                 implicitHeight: 34
-                enabled: false
+                onClicked: openVideoDialog.open()
                 background: Rectangle {
-                    color: "transparent"
-                    border.color: "#E5E8EB"
-                    border.width: 1
+                    color: "#6F86AB"
                     radius: 6
                 }
                 contentItem: Text {
                     text: parent.text
-                    color: "#B0B4B8"
+                    color: "#FFFFFF"
                     font.pixelSize: 13
                     horizontalAlignment: Text.AlignHCenter
                     verticalAlignment: Text.AlignVCenter

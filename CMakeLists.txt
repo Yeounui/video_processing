@@ -1,11 +1,23 @@
 cmake_minimum_required(VERSION 3.16)
 
-project(qt_ui LANGUAGES CXX)
+project(qt_ui LANGUAGES CXX C)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 find_package(Qt6 REQUIRED COMPONENTS Core Gui Qml Quick QuickControls2)
+
+# FFmpeg — conda videoprocess environment
+set(FFMPEG_PREFIX "/home/seuoh/miniforge3/envs/videoprocess")
+find_path(AVFORMAT_INCLUDE_DIR libavformat/avformat.h HINTS "${FFMPEG_PREFIX}/include" REQUIRED)
+# Use static libraries to avoid transitive dependency issues
+find_library(AVFORMAT_LIB avformat HINTS "${FFMPEG_PREFIX}/lib" REQUIRED)
+find_library(AVCODEC_LIB  avcodec  HINTS "${FFMPEG_PREFIX}/lib" REQUIRED)
+find_library(AVUTIL_LIB   avutil   HINTS "${FFMPEG_PREFIX}/lib" REQUIRED)
+find_library(SWSCALE_LIB  swscale  HINTS "${FFMPEG_PREFIX}/lib" REQUIRED)
+
+# Stub shared lib: provides x264_bit_depth missing from conda videoprocess libx264.so.138
+add_library(x264_compat SHARED src/x264_compat.c)
 
 qt_standard_project_setup()
 
@@ -31,6 +43,8 @@ qt_add_qml_module(qt_ui
         include/ImageBuffer.h
         include/ImageIoService.h
         src/ImageIoService.cpp
+        include/VideoInputService.h
+        src/VideoInputService.cpp
         include/ProcessingController.h
         src/ProcessingController.cpp
         include/ProcessingViewportItem.h
@@ -42,6 +56,7 @@ qt_add_qml_module(qt_ui
 )
 
 target_include_directories(qt_ui PRIVATE include)
+target_include_directories(qt_ui PRIVATE "${FFMPEG_PREFIX}/include")
 
 target_link_libraries(qt_ui
     PRIVATE
@@ -50,6 +65,13 @@ target_link_libraries(qt_ui
         Qt6::Qml
         Qt6::Quick
         Qt6::QuickControls2
+        ${AVFORMAT_LIB} ${AVCODEC_LIB} ${AVUTIL_LIB} ${SWSCALE_LIB}
+        x264_compat
+)
+
+set_target_properties(qt_ui PROPERTIES
+    BUILD_RPATH "${FFMPEG_PREFIX}/lib;${CMAKE_BINARY_DIR}"
+    LINK_FLAGS "-Wl,-rpath-link,${FFMPEG_PREFIX}/lib,--allow-shlib-undefined"
 )
 
 # ImageProcessorCore unit tests
@@ -86,6 +108,8 @@ if(Qt6Test_FOUND)
         include/ImageBuffer.h
         include/ImageIoService.h
         src/ImageIoService.cpp
+        include/VideoInputService.h
+        src/VideoInputService.cpp
         include/ProcessingController.h
         src/ProcessingController.cpp
         include/ImageProcessorCore.h
@@ -94,8 +118,13 @@ if(Qt6Test_FOUND)
         src/GpuEffectPipeline.cpp
     )
     target_include_directories(tst_ProcessingController PRIVATE include)
+    target_include_directories(tst_ProcessingController PRIVATE "${FFMPEG_PREFIX}/include")
     target_compile_definitions(tst_ProcessingController PRIVATE TEST_IMAGE_PATH="${CMAKE_CURRENT_SOURCE_DIR}/ui_template/desktop.webp")
-    target_link_libraries(tst_ProcessingController PRIVATE Qt6::Core Qt6::Gui Qt6::Qml Qt6::OpenGL Qt6::Test)
+    target_link_libraries(tst_ProcessingController PRIVATE Qt6::Core Qt6::Gui Qt6::Qml Qt6::OpenGL Qt6::Test ${AVFORMAT_LIB} ${AVCODEC_LIB} ${AVUTIL_LIB} ${SWSCALE_LIB} x264_compat)
+    set_target_properties(tst_ProcessingController PROPERTIES
+        BUILD_RPATH "${FFMPEG_PREFIX}/lib;${CMAKE_BINARY_DIR}"
+        LINK_FLAGS "-Wl,-rpath-link,${FFMPEG_PREFIX}/lib,--allow-shlib-undefined"
+    )
     add_test(NAME tst_ProcessingController COMMAND tst_ProcessingController)
     set_tests_properties(tst_ProcessingController PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 endif()

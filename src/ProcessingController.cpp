@@ -3,7 +3,9 @@
 #include "ImageProcessorCore.h"
 #include "ImageIoService.h"
 #include "GpuEffectPipeline.h"
+#include "VideoInputService.h"
 #include <QFileInfo>
+#include <QUrl>
 #include <utility>
 
 namespace {
@@ -46,6 +48,31 @@ ProcessingController::ProcessingController(QObject *parent)
 }
 
 ProcessingController::~ProcessingController() = default;
+
+bool ProcessingController::isVideoSource() const
+{
+    return sourceType_ == SourceType::SOURCE_VIDEO_FILE;
+}
+
+bool ProcessingController::videoPlaying() const
+{
+    return videoService_ && videoService_->isPlaying();
+}
+
+double ProcessingController::videoDuration() const
+{
+    return videoService_ ? videoService_->durationSecs() : 0.0;
+}
+
+double ProcessingController::videoPosition() const
+{
+    return videoPosition_;
+}
+
+int ProcessingController::effectStackSize() const
+{
+    return static_cast<int>(effectStack_.size());
+}
 
 bool ProcessingController::hasImage() const
 {
@@ -155,11 +182,54 @@ void ProcessingController::saveImage(const QUrl &url)
     }
 }
 
+void ProcessingController::openVideo(const QUrl &url)
+{
+    QString path = url.toLocalFile();
+
+    if (!videoService_) {
+        videoService_ = new VideoInputService(this);
+        connect(videoService_, &VideoInputService::frameReady, this, &ProcessingController::onVideoFrame);
+        connect(videoService_, &VideoInputService::positionChanged, this, &ProcessingController::onVideoPosition);
+        connect(videoService_, &VideoInputService::playbackFinished, this, &ProcessingController::onVideoPlaybackFinished);
+        connect(videoService_, &VideoInputService::errorOccurred, this, &ProcessingController::errorOccurred);
+    } else {
+        videoService_->close();
+    }
+
+    if (!videoService_->open(path)) {
+        return;  // errorOccurred already emitted by videoService_
+    }
+
+    clearHistory();
+    effectStack_.clear();
+    inImage_.reset();
+    outImage_.reset();
+    ++inImageVersion_;
+    ++outImageVersion_;
+    sourceType_ = SourceType::SOURCE_VIDEO_FILE;
+    sourceFileName_ = QFileInfo(path).fileName();
+    videoPosition_ = 0.0;
+
+    emit sourceChanged();
+    emit hasImageChanged();
+    emit canSaveChanged();
+    emit effectStackChanged();
+
+    // Deliver first frame
+    videoService_->stepForward();
+}
+
 void ProcessingController::reset()
 {
     clearHistory();
 
     if (!inImage_) {
+        return;
+    }
+
+    // Video mode: clear effect stack only
+    if (sourceType_ == SourceType::SOURCE_VIDEO_FILE) {
+        clearEffectStack();
         return;
     }
 
@@ -182,6 +252,14 @@ void ProcessingController::applyAlgorithm(int algorithmId, const QVariantMap &pa
     }
 
     QVariantMap mutableParams = params;
+
+    // Video mode: append to effect stack instead of static apply
+    if (sourceType_ == SourceType::SOURCE_VIDEO_FILE) {
+        if (!appendEffect(algorithmId, mutableParams)) {
+            emit errorOccurred(QStringLiteral("Effect stack is full (max 3)"));
+        }
+        return;
+    }
     if (algorithmId == 5) {
         mutableParams.insert(QStringLiteral("stat_average"),
                              ImageProcessorCore::computeAverageLuminance(*outImage_));
@@ -299,4 +377,143 @@ void ProcessingController::cancelGpuApply()
     gpuApplyPending_ = false;
     gpuPrevOut_.reset();
     emit errorOccurred(QStringLiteral("GPU effect failed; result unchanged"));
+}
+
+bool ProcessingController::appendEffect(int algorithmId, const QVariantMap &params)
+{
+    if (static_cast<int>(effectStack_.size()) >= MaxEffectStack) {
+        return false;
+    }
+
+    effectStack_.push_back({algorithmId, params});
+    emit effectStackChanged();
+
+    // Re-apply stack to current inImage_ so user sees result immediately
+    if (inImage_) {
+        auto result = applyEffectStack(inImage_);
+        outImage_ = result;
+        ++outImageVersion_;
+        emit imageChanged();
+    }
+
+    return true;
+}
+
+void ProcessingController::removeEffect(int index)
+{
+    if (index < 0 || index >= static_cast<int>(effectStack_.size())) {
+        return;
+    }
+
+    effectStack_.erase(effectStack_.begin() + index);
+    emit effectStackChanged();
+
+    if (inImage_) {
+        outImage_ = applyEffectStack(inImage_);
+        ++outImageVersion_;
+        emit imageChanged();
+    }
+}
+
+void ProcessingController::clearEffectStack()
+{
+    if (effectStack_.empty()) {
+        return;
+    }
+
+    effectStack_.clear();
+    emit effectStackChanged();
+
+    if (inImage_) {
+        outImage_ = std::make_shared<ImageBuffer>(*inImage_);
+        ++outImageVersion_;
+        emit imageChanged();
+    }
+}
+
+std::shared_ptr<ImageBuffer> ProcessingController::applyEffectStack(std::shared_ptr<ImageBuffer> src)
+{
+    auto cur = src;
+    for (const auto &e : effectStack_) {
+        auto out = std::make_shared<ImageBuffer>();
+        if (!ImageProcessorCore::apply(*cur, *out, e.algorithmId, e.params)) {
+            break;
+        }
+        cur = out;
+    }
+    return cur;
+}
+
+void ProcessingController::onVideoFrame(std::shared_ptr<ImageBuffer> frame)
+{
+    inImage_ = frame;
+    ++inImageVersion_;
+    outImage_ = applyEffectStack(frame);
+    ++outImageVersion_;
+    emit imageChanged();
+    if (!hasImage()) {
+        emit hasImageChanged();
+    }
+}
+
+void ProcessingController::onVideoPosition(double secs)
+{
+    videoPosition_ = secs;
+    emit videoPositionChanged(secs);
+}
+
+void ProcessingController::onVideoPlaybackFinished()
+{
+    emit videoPlayingChanged();
+}
+
+void ProcessingController::playVideo()
+{
+    if (videoService_) {
+        videoService_->play();
+        emit videoPlayingChanged();
+    }
+}
+
+void ProcessingController::pauseVideo()
+{
+    if (videoService_) {
+        videoService_->pause();
+        emit videoPlayingChanged();
+    }
+}
+
+void ProcessingController::stepForwardVideo()
+{
+    if (videoService_) {
+        videoService_->stepForward();
+    }
+}
+
+void ProcessingController::stepBackwardVideo()
+{
+    if (videoService_) {
+        videoService_->stepBackward();
+    }
+}
+
+void ProcessingController::seekVideo(double secs)
+{
+    if (videoService_) {
+        videoService_->seekToSecs(secs);
+    }
+}
+
+void ProcessingController::setVideoLoop(bool loop)
+{
+    if (videoService_) {
+        videoService_->setLoop(loop);
+    }
+}
+
+void ProcessingController::setVideoSpeed(double speed)
+{
+    if (videoService_) {
+        videoService_->setSpeed(speed);
+    }
 }

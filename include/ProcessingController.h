@@ -3,6 +3,7 @@
 #include "EditCommand.h"
 #include "ImageBuffer.h"
 #include <deque>
+#include <vector>
 #include <QObject>
 #include <QString>
 #include <QUrl>
@@ -11,6 +12,7 @@
 #include <memory>
 
 class AlgorithmModel;
+class VideoInputService;
 
 class ProcessingController : public QObject {
     Q_OBJECT
@@ -24,6 +26,12 @@ class ProcessingController : public QObject {
     Q_PROPERTY(QString sourceFileName READ sourceFileName NOTIFY sourceChanged)
     Q_PROPERTY(int imageWidth READ imageWidth NOTIFY sourceChanged)
     Q_PROPERTY(int imageHeight READ imageHeight NOTIFY sourceChanged)
+    // Video properties
+    Q_PROPERTY(bool isVideoSource READ isVideoSource NOTIFY sourceChanged)
+    Q_PROPERTY(bool videoPlaying READ videoPlaying NOTIFY videoPlayingChanged)
+    Q_PROPERTY(double videoDuration READ videoDuration NOTIFY sourceChanged)
+    Q_PROPERTY(double videoPosition READ videoPosition NOTIFY videoPositionChanged)
+    Q_PROPERTY(int effectStackSize READ effectStackSize NOTIFY effectStackChanged)
 
 public:
     explicit ProcessingController(QObject *parent = nullptr);
@@ -38,6 +46,11 @@ public:
     QString sourceFileName() const;
     int imageWidth() const;
     int imageHeight() const;
+    bool isVideoSource() const;
+    bool videoPlaying() const;
+    double videoDuration() const;
+    double videoPosition() const;
+    int effectStackSize() const;
 
     // Public (non-QML) accessors
     std::shared_ptr<ImageBuffer> inImage() const;
@@ -59,6 +72,21 @@ public:
     Q_INVOKABLE void undo();
     Q_INVOKABLE void redo();
 
+    // Video control
+    Q_INVOKABLE void openVideo(const QUrl &url);
+    Q_INVOKABLE void playVideo();
+    Q_INVOKABLE void pauseVideo();
+    Q_INVOKABLE void stepForwardVideo();
+    Q_INVOKABLE void stepBackwardVideo();
+    Q_INVOKABLE void seekVideo(double secs);
+    Q_INVOKABLE void setVideoLoop(bool loop);
+    Q_INVOKABLE void setVideoSpeed(double speed);
+
+    // Effect stack (video/stream mode, max 3 entries)
+    Q_INVOKABLE bool appendEffect(int algorithmId, const QVariantMap &params);
+    Q_INVOKABLE void removeEffect(int index);
+    Q_INVOKABLE void clearEffectStack();
+
 signals:
     void hasImageChanged();
     void canSaveChanged();
@@ -67,10 +95,21 @@ signals:
     void imageChanged();
     void errorOccurred(const QString &message);
     void pendingGpuApply(std::shared_ptr<ImageBuffer> src, int algorithmId, QVariantMap params);
+    // Video signals
+    void videoPlayingChanged();
+    void videoPositionChanged(double secs);
+    void effectStackChanged();
+
+private slots:
+    void onVideoFrame(std::shared_ptr<ImageBuffer> frame);
+    void onVideoPosition(double secs);
+    void onVideoPlaybackFinished();
 
 private:
     void clearHistory();
     void pushCommand(std::unique_ptr<EditCommand> command);
+    // Apply effectStack_ to src sequentially; returns result or src if stack is empty.
+    std::shared_ptr<ImageBuffer> applyEffectStack(std::shared_ptr<ImageBuffer> src);
 
     std::shared_ptr<ImageBuffer> inImage_;
     std::shared_ptr<ImageBuffer> outImage_;
@@ -86,4 +125,13 @@ private:
     // GPU effect state
     bool gpuApplyPending_ = false;
     std::shared_ptr<ImageBuffer> gpuPrevOut_;
+
+    // Video
+    VideoInputService *videoService_ = nullptr;
+    double videoPosition_ = 0.0;
+
+    // Effect stack (video/stream mode only; max 3)
+    struct EffectEntry { int algorithmId; QVariantMap params; };
+    static constexpr int MaxEffectStack = 3;
+    std::vector<EffectEntry> effectStack_;
 };
