@@ -46,6 +46,11 @@ public:
     quint64 outImageVersion() const;
     void setOutImageDirect(std::shared_ptr<ImageBuffer> img);
 
+    // GPU state accessors
+    bool gpuApplyPending() const { return gpuApplyPending_; }
+    void commitGpuResult(std::shared_ptr<ImageBuffer> result);
+    void cancelGpuApply();
+
     // Public slots (Q_INVOKABLE)
     Q_INVOKABLE void openImage(const QUrl &url);
     Q_INVOKABLE void saveImage(const QUrl &url);
@@ -61,6 +66,7 @@ signals:
     void sourceChanged();
     void imageChanged();
     void errorOccurred(const QString &message);
+    void pendingGpuApply(std::shared_ptr<ImageBuffer> src, int algorithmId, QVariantMap params);
 
 private:
     void clearHistory();
@@ -76,4 +82,8 @@ private:
     std::deque<std::unique_ptr<EditCommand>> history_;
     int historyIndex_ = -1;
     std::size_t historyBytes_ = 0;
+
+    // GPU effect state
+    bool gpuApplyPending_ = false;
+    std::shared_ptr<ImageBuffer> gpuPrevOut_;
 };

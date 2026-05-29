@@ -37,6 +37,8 @@ qt_add_qml_module(qt_ui
         src/ProcessingViewportItem.cpp
         include/ImageProcessorCore.h
         src/ImageProcessorCore.cpp
+        include/GpuEffectPipeline.h
+        src/GpuEffectPipeline.cpp
 )
 
 target_include_directories(qt_ui PRIVATE include)
@@ -88,10 +90,12 @@ if(Qt6Test_FOUND)
         src/ProcessingController.cpp
         include/ImageProcessorCore.h
         src/ImageProcessorCore.cpp
+        include/GpuEffectPipeline.h
+        src/GpuEffectPipeline.cpp
     )
     target_include_directories(tst_ProcessingController PRIVATE include)
     target_compile_definitions(tst_ProcessingController PRIVATE TEST_IMAGE_PATH="${CMAKE_CURRENT_SOURCE_DIR}/ui_template/desktop.webp")
-    target_link_libraries(tst_ProcessingController PRIVATE Qt6::Core Qt6::Gui Qt6::Qml Qt6::Test)
+    target_link_libraries(tst_ProcessingController PRIVATE Qt6::Core Qt6::Gui Qt6::Qml Qt6::OpenGL Qt6::Test)
     add_test(NAME tst_ProcessingController COMMAND tst_ProcessingController)
     set_tests_properties(tst_ProcessingController PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 endif()

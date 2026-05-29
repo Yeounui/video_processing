@@ -1,6 +1,7 @@
 #include "ProcessingViewportItem.h"
 #include "ProcessingController.h"
 #include "ImageBuffer.h"
+#include "GpuEffectPipeline.h"
 #include <QSGRenderNode>
 #include <QOpenGLFunctions_3_3_Core>
 #include <QOpenGLShaderProgram>
@@ -223,6 +224,7 @@ struct Snapshot {
     float   panOffsetX    = 0.0f;
     float   panOffsetY    = 0.0f;
     QQuickWindow *window  = nullptr;  // for beginExternalCommands()
+    PendingGpuCommand pendingGpuCmd;
 };
 
 // ============================================================================
@@ -268,6 +270,12 @@ private:
     quint64 uploadedOutVer_ = std::numeric_limits<quint64>::max();
     quint64 uploadedInVer_  = std::numeric_limits<quint64>::max();
     QSizeF  lastViewSize_;
+
+    GpuEffectPipeline gpuPipeline_;
+    ProcessingViewportItem *callbackItem_ = nullptr;
+
+public:
+    void setCallbackItem(ProcessingViewportItem *item) { callbackItem_ = item; }
 };
 
 // ============================================================================
@@ -336,6 +344,8 @@ bool ViewportRenderNode::initGL() {
 }
 
 void ViewportRenderNode::releaseResources() {
+    gpuPipeline_.destroy();
+
     if (!glInitialized_) return;
 
     if (texOut_) gl_.glDeleteTextures(1, &texOut_);
@@ -353,6 +363,20 @@ void ViewportRenderNode::releaseResources() {
 void ViewportRenderNode::render(const RenderState *state) {
     QQuickWindow *win = pending_.window;
     if (win) win->beginExternalCommands();
+
+    // GPU effect apply pass (before display rendering)
+    if (pending_.pendingGpuCmd.valid) {
+        auto &cmd = pending_.pendingGpuCmd;
+        auto result = gpuPipeline_.applyStaticEffect(*cmd.src, cmd.algorithmId, cmd.params);
+        pending_.pendingGpuCmd = {};  // Consumed
+        bool ok = (result != nullptr);
+        if (callbackItem_) {
+            ProcessingViewportItem *cb = callbackItem_;
+            QMetaObject::invokeMethod(cb, [cb, ok, result]() {
+                cb->deliverGpuResult(ok, result);
+            }, Qt::QueuedConnection);
+        }
+    }
 
     // Lazy initialization of OpenGL resources
     if (!glInitialized_ && !shaderFailed_)
@@ -471,6 +495,8 @@ void ProcessingViewportItem::setController(ProcessingController *ctrl) {
                    this, &ProcessingViewportItem::onImageChanged);
         disconnect(controller_, &ProcessingController::sourceChanged,
                    this, &ProcessingViewportItem::onImageChanged);
+        disconnect(controller_, &ProcessingController::pendingGpuApply,
+                   this, &ProcessingViewportItem::onPendingGpuApply);
     }
 
     controller_ = ctrl;
@@ -482,6 +508,9 @@ void ProcessingViewportItem::setController(ProcessingController *ctrl) {
                 this, &ProcessingViewportItem::onImageChanged);
         connect(controller_, &ProcessingController::sourceChanged,
                 this, &ProcessingViewportItem::onImageChanged);
+        connect(controller_, &ProcessingController::pendingGpuApply,
+                this, &ProcessingViewportItem::onPendingGpuApply,
+                Qt::DirectConnection);
     }
 
     emit controllerChanged();
@@ -599,6 +628,13 @@ QSGNode *ProcessingViewportItem::updatePaintNode(QSGNode *old, UpdatePaintNodeDa
     snap.panOffsetY    = (float)panOffsetY_;
     snap.window        = window();
 
+    // Transfer pending GPU command to snapshot
+    if (pendingGpuCmd_.valid) {
+        snap.pendingGpuCmd = pendingGpuCmd_;
+        pendingGpuCmd_ = {};
+    }
+
+    node->setCallbackItem(this);
     node->setSnapshot(snap);
     return node;
 }
@@ -679,4 +715,24 @@ void ProcessingViewportItem::onImageChanged() {
         }
     }
     update();
+}
+
+void ProcessingViewportItem::onPendingGpuApply(
+    std::shared_ptr<ImageBuffer> src, int algorithmId, const QVariantMap &params)
+{
+    pendingGpuCmd_.src = src;
+    pendingGpuCmd_.algorithmId = algorithmId;
+    pendingGpuCmd_.params = params;
+    pendingGpuCmd_.valid = true;
+    update();
+}
+
+void ProcessingViewportItem::deliverGpuResult(bool ok, std::shared_ptr<ImageBuffer> result)
+{
+    if (!controller_) return;
+    if (ok) {
+        controller_->commitGpuResult(result);
+    } else {
+        controller_->cancelGpuApply();
+    }
 }

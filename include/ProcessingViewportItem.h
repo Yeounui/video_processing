@@ -5,8 +5,18 @@
 #include <QPointF>
 #include <QtQml/qqmlregistration.h>
 #include <limits>
+#include <memory>
 
 class ProcessingController;
+class ImageBuffer;
+
+// Data passed from main thread to render thread for GPU effect apply
+struct PendingGpuCommand {
+    std::shared_ptr<ImageBuffer> src;
+    int algorithmId = 0;
+    QVariantMap params;
+    bool valid = false;
+};
 
 class ProcessingViewportItem : public QQuickItem {
     Q_OBJECT
@@ -64,6 +74,10 @@ protected:
 
 private slots:
     void onImageChanged();
+    void onPendingGpuApply(std::shared_ptr<ImageBuffer> src, int algorithmId, const QVariantMap &params);
+
+public:
+    Q_INVOKABLE void deliverGpuResult(bool ok, std::shared_ptr<ImageBuffer> result);
 
 private:
     QPointer<ProcessingController> controller_;
@@ -84,4 +98,6 @@ private:
     QPointF dragStart_;
     qreal  dragStartPanX_ = 0.0;
     qreal  dragStartPanY_ = 0.0;
+
+    PendingGpuCommand pendingGpuCmd_;
 };

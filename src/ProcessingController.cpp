@@ -2,6 +2,7 @@
 #include "AlgorithmModel.h"
 #include "ImageProcessorCore.h"
 #include "ImageIoService.h"
+#include "GpuEffectPipeline.h"
 #include <QFileInfo>
 #include <utility>
 
@@ -175,6 +176,11 @@ void ProcessingController::applyAlgorithm(int algorithmId, const QVariantMap &pa
         return;
     }
 
+    if (gpuApplyPending_) {
+        emit errorOccurred(QStringLiteral("GPU effect in progress"));
+        return;
+    }
+
     QVariantMap mutableParams = params;
     if (algorithmId == 5) {
         mutableParams.insert(QStringLiteral("stat_average"),
@@ -203,6 +209,15 @@ void ProcessingController::applyAlgorithm(int algorithmId, const QVariantMap &pa
         mutableParams.insert(QStringLiteral("stat_hmax"), hmax);
     }
 
+    // Check if GPU path is available for this algorithm
+    if (GpuEffectPipeline::supportsAlgorithm(algorithmId)) {
+        gpuPrevOut_ = outImage_;
+        gpuApplyPending_ = true;
+        emit pendingGpuApply(outImage_, algorithmId, mutableParams);
+        return;  // async; commitGpuResult() will finish
+    }
+
+    // CPU path (unchanged from Phase 3)
     auto prevOut = outImage_;
     auto scratch = std::make_shared<ImageBuffer>();
     if (!ImageProcessorCore::apply(*outImage_, *scratch, algorithmId, mutableParams)) {
@@ -264,4 +279,24 @@ void ProcessingController::pushCommand(std::unique_ptr<EditCommand> command)
         history_.pop_front();
         --historyIndex_;
     }
+}
+
+void ProcessingController::commitGpuResult(std::shared_ptr<ImageBuffer> result)
+{
+    if (!gpuApplyPending_) return;
+    gpuApplyPending_ = false;
+    pushCommand(std::make_unique<StaticApplyCommand>(this, gpuPrevOut_, result));
+    gpuPrevOut_.reset();
+    outImage_ = result;
+    ++outImageVersion_;
+    emit imageChanged();
+    emit canSaveChanged();
+    emit historyChanged();
+}
+
+void ProcessingController::cancelGpuApply()
+{
+    gpuApplyPending_ = false;
+    gpuPrevOut_.reset();
+    emit errorOccurred(QStringLiteral("GPU effect failed; result unchanged"));
 }
