@@ -109,22 +109,6 @@ bool VideoInputService::open(const QString &path)
         durationSecs_ = 0.0;
     }
 
-    // Create sws context for RGB24 conversion
-    swsCtx_ = sws_getContext(codecCtx_->width, codecCtx_->height, codecCtx_->pix_fmt,
-                             codecCtx_->width, codecCtx_->height, AV_PIX_FMT_RGB24,
-                             SWS_BILINEAR, nullptr, nullptr, nullptr);
-    if (!swsCtx_) {
-        av_frame_free(&frame_);
-        frame_ = nullptr;
-        avcodec_close(codecCtx_);
-        av_free(codecCtx_);
-        codecCtx_ = nullptr;
-        avformat_close_input(&fmtCtx_);
-        fmtCtx_ = nullptr;
-        emit errorOccurred("Failed to create sws context");
-        return false;
-    }
-
     currentTimeSecs_ = 0.0;
     return true;
 }
@@ -280,17 +264,29 @@ std::shared_ptr<ImageBuffer> VideoInputService::decodeNextFrame()
         av_free_packet(&pkt);
 
         if (gotFrame) {
-            // Frame decoded successfully
+            // Lazy-create or recreate sws context using actual frame dimensions/format
+            AVPixelFormat srcFmt = static_cast<AVPixelFormat>(frame_->format);
+            int w = frame_->width  > 0 ? frame_->width  : codecCtx_->width;
+            int h = frame_->height > 0 ? frame_->height : codecCtx_->height;
+            if (!swsCtx_) {
+                swsCtx_ = sws_getContext(w, h, srcFmt,
+                                         w, h, AV_PIX_FMT_RGB24,
+                                         SWS_BILINEAR, nullptr, nullptr, nullptr);
+                if (!swsCtx_) {
+                    continue;  // skip this frame, try next
+                }
+            }
+
             auto buf = std::make_shared<ImageBuffer>();
-            buf->width = codecCtx_->width;
-            buf->height = codecCtx_->height;
+            buf->width = w;
+            buf->height = h;
             buf->channels = 3;
             buf->data.resize(static_cast<std::size_t>(buf->width * buf->height * 3));
 
             uint8_t *dst[1] = {buf->data.data()};
             int dstStride[1] = {buf->width * 3};
 
-            sws_scale(swsCtx_, frame_->data, frame_->linesize, 0, codecCtx_->height,
+            sws_scale(swsCtx_, frame_->data, frame_->linesize, 0, h,
                       dst, dstStride);
 
             // Update timestamp

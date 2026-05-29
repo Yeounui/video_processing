@@ -446,12 +446,13 @@ std::shared_ptr<ImageBuffer> ProcessingController::applyEffectStack(std::shared_
 
 void ProcessingController::onVideoFrame(std::shared_ptr<ImageBuffer> frame)
 {
+    bool wasEmpty = !inImage_;
     inImage_ = frame;
     ++inImageVersion_;
     outImage_ = applyEffectStack(frame);
     ++outImageVersion_;
     emit imageChanged();
-    if (!hasImage()) {
+    if (wasEmpty) {
         emit hasImageChanged();
     }
 }
