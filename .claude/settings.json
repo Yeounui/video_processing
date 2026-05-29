@@ -6,7 +6,9 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash /home/seuoh/workspace/qt_ui/.claude/hooks/check_conda_activation.sh"
+            "if": "Bash(conda *)",
+            "command": "bash ${CLAUDE_PROJECT_DIR}/.claude/hooks/check_conda_activation.sh",
+            "statusMessage": "Conda..."
           }
         ]
       }
@@ -16,7 +18,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/home/seuoh/miniforge3/bin/conda run -n videoprocess cmake --build /home/seuoh/workspace/qt_ui/build 2>/dev/null || true",
+            "command": "bash -c 'source /home/seuoh/miniforge3/etc/profile.d/conda.sh && conda activate videoprocess && cmake --build /home/seuoh/workspace/qt_ui/build' 2>/dev/null || true",
             "statusMessage": "Building..."
           }
         ]

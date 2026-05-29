@@ -34,13 +34,16 @@ Based on the direct bootstrap context and what each canonical plan document requ
 Use `init-plan-reader` for targeted rereads, supplemental extraction, or mechanical extraction after the `init-plan` opus controller's direct first pass. The reader may read files Opus already read, including `plan.md`, `structure.md`, and other root bootstrap specs, when Opus needs exact facts, section-level extraction, conflict listing, or comparison with other sources. Do not delegate interpretation of those documents to the reader; pass narrow reread questions or exact extraction targets.
 
 Spawn the `init-plan-reader` agent with:
-- Relevant excerpts from Step 1 direct reads
-- Existing `plan/` documents if any and if the user approved proceeding
-- Root bootstrap documents already read by Opus when a targeted reread is needed
-- Config files (e.g. package.json, pyproject.toml) or source files if relevant to architecture
-- The full query list from Step 2
 
-Wait for all answers before proceeding.
+- **Assigned Files**: paths to read directly (targeted rereads, exact wording, conflict detection)
+- **Passed Excerpts**: exact sections from Step 1 reads needed for context without full rereads
+- **Query List**: one numbered query per fact; reader responds per number
+  ```
+  Query 1: [exact extraction question — name file and section if known]
+  Query 2: ...
+  ```
+
+Wait for all answers. On `NOT_FOUND`: record as missing fact or open question in Step 4; do not ask reader to infer a substitute.
 
 ## Step 4 — Opus Planning Gate
 
@@ -66,13 +69,13 @@ Spawn the `init-plan-writer` agent using this handoff template:
 | **Direct Bootstrap Context** | Exact facts or excerpts from Step 1 root specs selected for writing |
 | **Reader Facts** | Complete Step 3 supplemental answers or exact excerpts selected for writing |
 | **Documents To Create/Update** | Exact `plan/...` file paths |
-| **Document Bodies** | Heading-by-heading content to write, including intended status terms |
+| **Document Bodies** | For each document: heading names with exact text under each — opus supplies full content, no gaps for init-plan-writer to infer. |
 | **Preserve Rules** | Existing headings, links, tables, status shapes, or wording that must remain unchanged |
 | **Do Not Write** | Facts, documents, sections, or interpretations excluded by Step 4 |
-| **Self-Audit Scope** | Canonical placement, links, status terms, verification evidence, missing facts, and contradictions against reader evidence |
+| **Self-Audit Scope** | Standard — init-plan-writer runs its built-in 6-point self-audit. Add specific exclusions or extra checks only if needed. |
 | **Expected Output** | Changed files, skipped files, self-audit result, and missing instructions |
 
-Include the canonical document table from `.claude/rules/Edit_Workflow.md`. Instruct `init-plan-writer` to create only the canonical plan documents supported by the supplied facts, avoid inferred requirements, invented status, or speculative architecture, and run its built-in self-audit after writing.
+Instruct `init-plan-writer` to read `.claude/rules/Edit_Workflow.md` for canonical document placement and status terms. Instruct it to create only the canonical plan documents supported by the supplied facts, avoid inferred requirements, invented status, or speculative architecture, and run its built-in self-audit after writing.
 
 Wait for `init-plan-writer` to finish writing and self-auditing the created documents.
 
