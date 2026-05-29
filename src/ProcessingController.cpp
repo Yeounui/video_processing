@@ -86,9 +86,19 @@ int ProcessingController::imageHeight() const
     return inImage_ ? inImage_->height : 0;
 }
 
+std::shared_ptr<ImageBuffer> ProcessingController::inImage() const
+{
+    return inImage_;
+}
+
 std::shared_ptr<ImageBuffer> ProcessingController::outImage() const
 {
     return outImage_;
+}
+
+quint64 ProcessingController::inImageVersion() const
+{
+    return inImageVersion_;
 }
 
 quint64 ProcessingController::outImageVersion() const
@@ -117,6 +127,7 @@ void ProcessingController::openImage(const QUrl &url)
 
     // Load succeeded, now update state
     inImage_ = newBuf;
+    ++inImageVersion_;
     outImage_ = std::make_shared<ImageBuffer>(*newBuf);  // deep copy
     ++outImageVersion_;
     sourceType_ = SourceType::SOURCE_IMAGE;

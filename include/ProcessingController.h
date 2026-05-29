@@ -40,7 +40,9 @@ public:
     int imageHeight() const;
 
     // Public (non-QML) accessors
+    std::shared_ptr<ImageBuffer> inImage() const;
     std::shared_ptr<ImageBuffer> outImage() const;
+    quint64 inImageVersion() const;
     quint64 outImageVersion() const;
     void setOutImageDirect(std::shared_ptr<ImageBuffer> img);
 
@@ -66,6 +68,7 @@ private:
 
     std::shared_ptr<ImageBuffer> inImage_;
     std::shared_ptr<ImageBuffer> outImage_;
+    quint64 inImageVersion_ = 0;
     quint64 outImageVersion_ = 0;
     SourceType sourceType_ = SourceType::SOURCE_NONE;
     QString sourceFileName_;

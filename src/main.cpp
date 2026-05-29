@@ -27,8 +27,10 @@ void applyWslgRuntimeFix()
     if (qEnvironmentVariableIsEmpty("QT_QPA_PLATFORM"))
         qputenv("QT_QPA_PLATFORM", "wayland");
 
-    if (qEnvironmentVariableIsEmpty("QT_QUICK_BACKEND"))
-        qputenv("QT_QUICK_BACKEND", "software");
+    // Force OpenGL RHI so QSGRenderNode raw-GL calls work (D10 hybrid shader requires GL context).
+    // WSLg Mesa d3d12 driver supports OpenGL 4.1+ via D3D12 passthrough.
+    if (qEnvironmentVariableIsEmpty("QSG_RHI_BACKEND"))
+        qputenv("QSG_RHI_BACKEND", "opengl");
 }
 
 }

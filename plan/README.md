@@ -4,11 +4,11 @@ Current status entry point and canonical document map. Other plan documents are 
 
 ## Current Status
 
-- Overall: **generated** — Phase 1 (Qt Quick) verified, Phase 2 (Static image) generated. ImageBuffer, ImageIoService, ProcessingController, and minimal viewport (GL_NEAREST + letterbox) implementation complete and building without errors.
+- Overall: **verified** — Phase 1 (Qt Quick) verified, Phase 2 (Static image) generated, Phase 3 (28 CPU algorithms) verified. Image buffer, IO service, processing controller, algorithm selection, parameter editing, Apply, Undo/Redo all functional.
 - Phase 1 (Qt Quick application skeleton): **verified** — CMakeLists.txt configured for Qt6 Core/Gui/Qml/Quick/QuickControls2; qt_add_qml_module(qt_ui URI "QtUi" VERSION 1.0); QML shell created.
 - Phase 2 (Static image basic workflow): **generated** — ImageBuffer (RGB888), ImageIoService (Qt image IO with D30 format normalization), ProcessingController image state (inImage/outImage shared_ptr per D39), minimal viewport (QSGSimpleTextureNode GL_NEAREST + letterbox per D29), error preservation (D30), reset semantics (D21), save gating (D9).
-- Phase 3 (28 CPU reference algorithms): **generated** — Package A (28 algorithms, 23 tests pass) and Package B (AlgorithmModel, EditCommand, undo/redo, QML wiring) complete. Build clean (0 errors). Visual interactive verification pending user test.
-- Phase 4 (QML OpenGL viewport): pending.
+- Phase 3 (28 CPU reference algorithms): **verified** — 28 algorithms implemented and selectable from inspector. Parameter adjustment, Apply, Undo/Redo, and reset functional. Image open/display/save/reset workflow confirmed.
+- Phase 4 (QML OpenGL viewport): **verified** — hybrid resampling shader with Sobel edge detection implemented. Original/A|B compare modes functional. Resize preserves aspect ratio. No residual frames on algorithm application. Known Phase 3 bug (rotate clipping) identified and deferred.
 - Phase 5 (GLSL effect pipeline): pending.
 - Phase 6 (Video file input): pending.
 - Phase 7 (Realtime stream input): pending.
@@ -16,7 +16,7 @@ Current status entry point and canonical document map. Other plan documents are 
 
 ## Next Action
 
-Begin Phase 3: implement 28 CPU reference algorithms against the algorithm contract in `structure.md`, wire per-algorithm parameter schema and defaults into backend model, wire QML inspector to algorithm search/selection/parameter editing/apply, and implement EditCommand + undo/redo history (max 20 steps, 512 MB budget).
+Fix Phase 3 rotate clipping bug: ImageProcessorCore.cpp rotate case clips output to input dimensions — expand canvas or center-crop without accumulation. Then proceed to Phase 5 (GLSL effect pipeline).
 
 ## Document Map
 
