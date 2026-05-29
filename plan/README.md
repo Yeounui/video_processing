@@ -8,7 +8,7 @@ Current status entry point and canonical document map. Other plan documents are 
 - Phase 1 (Qt Quick application skeleton): **verified** — CMakeLists.txt configured for Qt6 Core/Gui/Qml/Quick/QuickControls2; qt_add_qml_module(qt_ui URI "QtUi" VERSION 1.0); QML shell created.
 - Phase 2 (Static image basic workflow): **generated** — ImageBuffer (RGB888), ImageIoService (Qt image IO with D30 format normalization), ProcessingController image state (inImage/outImage shared_ptr per D39), minimal viewport (QSGSimpleTextureNode GL_NEAREST + letterbox per D29), error preservation (D30), reset semantics (D21), save gating (D9).
 - Phase 3 (28 CPU reference algorithms): **verified** — 28 algorithms implemented and selectable from inspector. Parameter adjustment, Apply, Undo/Redo, and reset functional. Image open/display/save/reset workflow confirmed.
-- Phase 4 (QML OpenGL viewport): **verified** — hybrid resampling shader with Sobel edge detection implemented. Original/A|B compare modes functional. Resize preserves aspect ratio. No residual frames on algorithm application. Known Phase 3 bug (rotate clipping) identified and deferred.
+- Phase 4 (QML OpenGL viewport): **verified** — hybrid resampling shader with Sobel edge detection implemented. Original/A|B compare modes functional. Resize preserves aspect ratio. No residual frames on algorithm application. Post-phase bugs fixed: GLSL vec4 type consistency, rotate RGBA output (transparent corners, stable canvas on repeated rotation), RGBA-aware image loading.
 - Phase 5 (GLSL effect pipeline): pending.
 - Phase 6 (Video file input): pending.
 - Phase 7 (Realtime stream input): pending.
@@ -16,7 +16,7 @@ Current status entry point and canonical document map. Other plan documents are 
 
 ## Next Action
 
-Fix Phase 3 rotate clipping bug: ImageProcessorCore.cpp rotate case clips output to input dimensions — expand canvas or center-crop without accumulation. Then proceed to Phase 5 (GLSL effect pipeline).
+Proceed to Phase 5 (GLSL effect pipeline): per-pixel effect shaders (brightness/contrast/saturation/hue as GPU path), wired into the existing algorithm dispatch.
 
 ## Document Map
 

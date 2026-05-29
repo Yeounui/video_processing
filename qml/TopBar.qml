@@ -10,7 +10,7 @@ Rectangle {
     FileDialog {
         id: openImageDialog
         title: "Open Image"
-        nameFilters: ["Image files (*.png *.jpg *.jpeg *.bmp *.tiff *.gif)", "All files (*)"]
+        nameFilters: ["Image files (*.png *.jpg *.jpeg *.bmp *.tiff *.gif *.webp)", "All files (*)"]
         fileMode: FileDialog.OpenFile
         onAccepted: ProcessingController.openImage(selectedFile)
     }

@@ -1,5 +1,6 @@
 #include <QtTest>
 #include "ImageProcessorCore.h"
+#include <algorithm>
 
 static ImageBuffer makeImage(int w, int h, uint8_t r, uint8_t g, uint8_t b) {
     ImageBuffer img;
@@ -16,7 +17,7 @@ static ImageBuffer makeImage(int w, int h, uint8_t r, uint8_t g, uint8_t b) {
 }
 
 static uint8_t getPx(const ImageBuffer& img, int x, int y, int c) {
-    return img.data[(y * img.width + x) * 3 + c];
+    return img.data[(y * img.width + x) * img.channels + c];
 }
 
 class TestImageProcessorCore : public QObject {
@@ -29,6 +30,13 @@ private slots:
     void testFixedThreshold();
     void testBitwiseAnd();
     void testFlipH();
+    void testRotate90ExpandsCanvas();
+    void testRotate180KeepsCanvasSize();
+    void testRotateArbitraryAngleExpandsCanvas();
+    void testRotatePreservesTransparentBackground();
+    void testRotateUsesVisibleAlphaBounds();
+    void testRotateRepeatedDoesNotShrink();
+    void testRotateOutputIsAlways4Channel();
     void testBlur3x3Uniform();
     void testGrayscaleAverage();
     void testGrayscaleLuminosity();
@@ -124,6 +132,150 @@ void TestImageProcessorCore::testFlipH() {
     QCOMPARE(getPx(dst, 0, 0, 0), (uint8_t)0);
     QCOMPARE(getPx(dst, 0, 0, 2), (uint8_t)255);
     QCOMPARE(getPx(dst, 1, 0, 0), (uint8_t)255);
+}
+
+void TestImageProcessorCore::testRotate90ExpandsCanvas() {
+    ImageBuffer src;
+    src.width = 2;
+    src.height = 3;
+    src.channels = 3;
+    src.data = {
+        10, 0, 0, 20, 0, 0,
+        30, 0, 0, 40, 0, 0,
+        50, 0, 0, 60, 0, 0,
+    };
+
+    ImageBuffer dst;
+    EffectParams p;
+    p["degree"] = 90.0;
+    ImageProcessorCore::apply(src, dst, 8, p);
+
+    QCOMPARE(dst.width, 3);
+    QCOMPARE(dst.height, 2);
+    QCOMPARE(getPx(dst, 0, 0, 0), (uint8_t)50);
+    QCOMPARE(getPx(dst, 1, 0, 0), (uint8_t)30);
+    QCOMPARE(getPx(dst, 2, 0, 0), (uint8_t)10);
+    QCOMPARE(getPx(dst, 0, 1, 0), (uint8_t)60);
+    QCOMPARE(getPx(dst, 1, 1, 0), (uint8_t)40);
+    QCOMPARE(getPx(dst, 2, 1, 0), (uint8_t)20);
+}
+
+void TestImageProcessorCore::testRotate180KeepsCanvasSize() {
+    auto src = makeImage(7, 5, 128, 128, 128);
+    ImageBuffer dst;
+    EffectParams p;
+    p["degree"] = 180.0;
+    ImageProcessorCore::apply(src, dst, 8, p);
+
+    QCOMPARE(dst.width, src.width);
+    QCOMPARE(dst.height, src.height);
+}
+
+void TestImageProcessorCore::testRotateArbitraryAngleExpandsCanvas() {
+    auto src = makeImage(10, 4, 128, 128, 128);
+    ImageBuffer dst;
+    EffectParams p;
+    p["degree"] = 30.0;
+    ImageProcessorCore::apply(src, dst, 8, p);
+
+    QVERIFY(dst.width > src.width);
+    QVERIFY(dst.height > src.height);
+    QCOMPARE((int)dst.data.size(), dst.width * dst.height * dst.channels);
+}
+
+void TestImageProcessorCore::testRotatePreservesTransparentBackground() {
+    ImageBuffer src;
+    src.width = 5;
+    src.height = 5;
+    src.channels = 4;
+    src.data.assign(src.width * src.height * src.channels, 0);
+    for (int y = 1; y <= 3; ++y) {
+        for (int x = 1; x <= 3; ++x) {
+            src.data[(y * src.width + x) * src.channels + 0] = 255;
+            src.data[(y * src.width + x) * src.channels + 3] = 255;
+        }
+    }
+
+    ImageBuffer dst;
+    EffectParams p;
+    p["degree"] = 45.0;
+    ImageProcessorCore::apply(src, dst, 8, p);
+
+    QCOMPARE(dst.channels, 4);
+    QVERIFY(std::any_of(dst.data.begin(), dst.data.end(), [](uint8_t v) { return v == 255; }));
+    QCOMPARE(getPx(dst, 0, 0, 3), (uint8_t)0);
+}
+
+void TestImageProcessorCore::testRotateUsesVisibleAlphaBounds() {
+    ImageBuffer src;
+    src.width = 9;
+    src.height = 9;
+    src.channels = 4;
+    src.data.assign(src.width * src.height * src.channels, 0);
+    for (int y = 3; y <= 5; ++y) {
+        for (int x = 3; x <= 5; ++x) {
+            src.data[(y * src.width + x) * src.channels + 0] = 200;
+            src.data[(y * src.width + x) * src.channels + 3] = 255;
+        }
+    }
+
+    ImageBuffer dst;
+    EffectParams p;
+    p["degree"] = 45.0;
+    ImageProcessorCore::apply(src, dst, 8, p);
+
+    QVERIFY(dst.width < src.width);
+    QVERIFY(dst.height < src.height);
+    QCOMPARE(dst.channels, 4);
+}
+
+void TestImageProcessorCore::testRotateRepeatedDoesNotShrink() {
+    // Rotating a solid RGB image 30° three times should not progressively
+    // grow the canvas (which would make the image appear smaller each time).
+    // After the first rotation, output is RGBA; subsequent rotations use the
+    // alpha-based content bounds so the canvas stays stable.
+    auto src = makeImage(100, 100, 200, 100, 50);
+    EffectParams p;
+    p["degree"] = 30.0;
+
+    ImageBuffer r1;
+    ImageProcessorCore::apply(src, r1, 8, p);
+    QCOMPARE(r1.channels, 4);
+    int w1 = r1.width, h1 = r1.height;
+
+    ImageBuffer r2;
+    ImageProcessorCore::apply(r1, r2, 8, p);
+    int w2 = r2.width, h2 = r2.height;
+
+    ImageBuffer r3;
+    ImageProcessorCore::apply(r2, r3, 8, p);
+    int w3 = r3.width, h3 = r3.height;
+
+    // Canvas must not grow cumulatively: each subsequent canvas should be
+    // no larger than 10% above the first rotation's output.
+    QVERIFY2(w2 <= w1 * 110 / 100, "Canvas grew more than 10% on second rotation");
+    QVERIFY2(h2 <= h1 * 110 / 100, "Canvas grew more than 10% on second rotation");
+    QVERIFY2(w3 <= w1 * 110 / 100, "Canvas grew more than 10% on third rotation");
+    QVERIFY2(h3 <= h1 * 110 / 100, "Canvas grew more than 10% on third rotation");
+}
+
+void TestImageProcessorCore::testRotateOutputIsAlways4Channel() {
+    // Rotate on RGB input must output RGBA so the viewport shader can
+    // composite transparent corners over the background colour.
+    auto src = makeImage(20, 20, 128, 128, 128);
+    QCOMPARE(src.channels, 3);
+
+    ImageBuffer dst;
+    EffectParams p;
+    p["degree"] = 45.0;
+    ImageProcessorCore::apply(src, dst, 8, p);
+
+    QCOMPARE(dst.channels, 4);
+    // Corner pixel (0,0) should be fully transparent (outside source bounds).
+    QCOMPARE(getPx(dst, 0, 0, 3), (uint8_t)0);
+    // Some pixel near the centre should be opaque.
+    int cx = dst.width / 2, cy = dst.height / 2;
+    QCOMPARE(getPx(dst, cx, cy, 3), (uint8_t)255);
 }
 
 void TestImageProcessorCore::testBlur3x3Uniform() {

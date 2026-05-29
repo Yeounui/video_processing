@@ -76,6 +76,8 @@ private:
     qreal zoomScale_      = 1.0;
     qreal panOffsetX_     = 0.0;  // in source-image pixels
     qreal panOffsetY_     = 0.0;
+    int   lastImageWidth_ = 0;
+    int   lastImageHeight_ = 0;
 
     // Drag-pan state
     bool   dragging_       = false;

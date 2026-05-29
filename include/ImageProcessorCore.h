@@ -40,8 +40,8 @@ public:
     // Returns the canonical list of all 28 AlgorithmSpecs (ids 1..28, in order).
     static const std::vector<AlgorithmSpec>& specs();
 
-    // Apply algorithm `algorithmId` (1..28) from src → dst.
-    // dst is resized to match src dimensions before writing.
+    // Apply algorithm `algorithmId` (1..28) from src to dst.
+    // Most algorithms keep src dimensions; rotate expands dst to fit the rotated image.
     // For stats-dependent algorithms (#5 averageThreshold, #10 contrastStretch,
     // #23 histogramStretch), the caller must pre-compute the stat and embed it in params:
     //   #5:  params["stat_average"]  = double (average luminance)

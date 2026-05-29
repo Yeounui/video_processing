@@ -1,5 +1,6 @@
 #include "ImageIoService.h"
 #include <QImage>
+#include <algorithm>
 
 std::shared_ptr<ImageBuffer> ImageIoService::load(const QString &path)
 {
@@ -7,21 +8,21 @@ std::shared_ptr<ImageBuffer> ImageIoService::load(const QString &path)
     if (img.isNull())
         return nullptr;
 
-    img = img.convertToFormat(QImage::Format_RGB888);
+    const bool hasAlpha = img.hasAlphaChannel();
+    img = img.convertToFormat(hasAlpha ? QImage::Format_RGBA8888 : QImage::Format_RGB888);
     if (img.isNull())
         return nullptr;
 
     auto buf = std::make_shared<ImageBuffer>();
     buf->width = img.width();
     buf->height = img.height();
-    buf->channels = 3;
+    buf->channels = hasAlpha ? 4 : 3;
     buf->data.resize(buf->width * buf->height * buf->channels);
 
-    // Copy scanlines into data buffer (stride = width * 3)
     for (int y = 0; y < buf->height; ++y) {
         const uint8_t *scanline = img.constScanLine(y);
-        std::copy(scanline, scanline + buf->width * 3,
-                  buf->data.begin() + y * buf->width * 3);
+        std::copy(scanline, scanline + buf->width * buf->channels,
+                  buf->data.begin() + y * buf->width * buf->channels);
     }
 
     return buf;
@@ -29,6 +30,7 @@ std::shared_ptr<ImageBuffer> ImageIoService::load(const QString &path)
 
 bool ImageIoService::save(const ImageBuffer &buf, const QString &path)
 {
-    QImage img(buf.data.data(), buf.width, buf.height, buf.width * 3, QImage::Format_RGB888);
+    const QImage::Format format = buf.channels == 4 ? QImage::Format_RGBA8888 : QImage::Format_RGB888;
+    QImage img(buf.data.data(), buf.width, buf.height, buf.width * buf.channels, format);
     return img.save(path);
 }

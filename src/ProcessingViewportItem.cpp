@@ -55,15 +55,15 @@ vec2 clampTC(vec2 tc, vec2 invSize) {
 // Bilinear Interpolation (manual, since texture is GL_NEAREST)
 // ============================================================================
 
-vec3 sampleBilinear(sampler2D tex, vec2 uv, vec2 invSize) {
+vec4 sampleBilinear(sampler2D tex, vec2 uv, vec2 invSize) {
     vec2 p = uv / invSize - 0.5;
     vec2 f = fract(p);
     vec2 base = (floor(p) + 0.5) * invSize;
 
-    vec3 s00 = texture(tex, clampTC(base, invSize)).rgb;
-    vec3 s10 = texture(tex, clampTC(base + vec2(invSize.x, 0.0), invSize)).rgb;
-    vec3 s01 = texture(tex, clampTC(base + vec2(0.0, invSize.y), invSize)).rgb;
-    vec3 s11 = texture(tex, clampTC(base + invSize, invSize)).rgb;
+    vec4 s00 = texture(tex, clampTC(base, invSize));
+    vec4 s10 = texture(tex, clampTC(base + vec2(invSize.x, 0.0), invSize));
+    vec4 s01 = texture(tex, clampTC(base + vec2(0.0, invSize.y), invSize));
+    vec4 s11 = texture(tex, clampTC(base + invSize, invSize));
 
     return mix(mix(s00, s10, f.x), mix(s01, s11, f.x), f.y);
 }
@@ -79,18 +79,18 @@ float cubicCR(float x) {
     return 0.0;
 }
 
-vec3 sampleBicubic(sampler2D tex, vec2 uv, vec2 invSize) {
+vec4 sampleBicubic(sampler2D tex, vec2 uv, vec2 invSize) {
     vec2 p = uv / invSize - 0.5;
     vec2 f = fract(p);
     vec2 base = floor(p);
 
-    vec3 color = vec3(0.0);
+    vec4 color = vec4(0.0);
     for (int j = -1; j <= 2; j++) {
         float wy = cubicCR(float(j) - f.y);
         for (int i = -1; i <= 2; i++) {
             float w = cubicCR(float(i) - f.x) * wy;
             vec2 coord = (base + vec2(float(i), float(j)) + 0.5) * invSize;
-            color += w * texture(tex, clampTC(coord, invSize)).rgb;
+            color += w * texture(tex, clampTC(coord, invSize));
         }
     }
     return color;
@@ -111,12 +111,12 @@ float lanczos3(float x) {
     return sinc(x) * sinc(x / 3.0);
 }
 
-vec3 sampleLanczos3(sampler2D tex, vec2 uv, vec2 invSize) {
+vec4 sampleLanczos3(sampler2D tex, vec2 uv, vec2 invSize) {
     vec2 p = uv / invSize - 0.5;
     vec2 f = fract(p);
     vec2 base = floor(p);
 
-    vec3 color = vec3(0.0);
+    vec4 color = vec4(0.0);
     float totalW = 0.0;
 
     for (int j = -2; j <= 3; j++) {
@@ -124,12 +124,12 @@ vec3 sampleLanczos3(sampler2D tex, vec2 uv, vec2 invSize) {
         for (int i = -2; i <= 3; i++) {
             float w = lanczos3(float(i) - f.x) * wy;
             vec2 coord = (base + vec2(float(i), float(j)) + 0.5) * invSize;
-            color += w * texture(tex, clampTC(coord, invSize)).rgb;
+            color += w * texture(tex, clampTC(coord, invSize));
             totalW += w;
         }
     }
 
-    return totalW > 1e-6 ? color / totalW : vec3(0.0);
+    return totalW > 1e-6 ? color / totalW : vec4(0.0);
 }
 
 // ============================================================================
@@ -156,7 +156,7 @@ float sobelEdge(sampler2D tex, vec2 uv, vec2 invSize) {
 // D10 Hybrid Resampling Dispatch
 // ============================================================================
 
-vec3 hybridSample(sampler2D tex, vec2 uv, vec2 invSize, float scale) {
+vec4 hybridSample(sampler2D tex, vec2 uv, vec2 invSize, float scale) {
     float edge = sobelEdge(tex, uv, invSize);
     bool isEdge = edge > 0.20;
 
@@ -187,7 +187,7 @@ void main() {
     vec2 uv = vec2((v_pos.x - rx) / rw, (v_pos.y - ry) / rh);
     vec2 invSize = 1.0 / u_texSize;
 
-    vec3 color;
+    vec4 color;
     if (u_splitCompare == 1) {
         // Split compare: left=original, right=result
         if (v_pos.x < u_splitPos)
@@ -202,7 +202,7 @@ void main() {
         color = hybridSample(u_texOut, uv, invSize, u_scale);
     }
 
-    fragColor = vec4(color, 1.0);
+    fragColor = vec4(mix(u_bgColor.rgb, color.rgb, clamp(color.a, 0.0, 1.0)), 1.0);
 }
 )glsl";
 
@@ -371,9 +371,12 @@ void ViewportRenderNode::render(const RenderState *state) {
 
         gl_.glBindTexture(GL_TEXTURE_2D, tex);
         gl_.glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-        gl_.glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8,
+        const bool hasAlpha = img->channels == 4;
+        GLenum format = hasAlpha ? GL_RGBA : GL_RGB;
+        GLenum internalFormat = hasAlpha ? GL_RGBA8 : GL_RGB8;
+        gl_.glTexImage2D(GL_TEXTURE_2D, 0, internalFormat,
                          img->width, img->height, 0,
-                         GL_RGB, GL_UNSIGNED_BYTE, img->data.data());
+                         format, GL_UNSIGNED_BYTE, img->data.data());
         uploadedVer = newVer;
     };
 
@@ -655,5 +658,25 @@ void ProcessingViewportItem::mouseReleaseEvent(QMouseEvent *event) {
 }
 
 void ProcessingViewportItem::onImageChanged() {
+    int imageWidth = 0;
+    int imageHeight = 0;
+    if (controller_ && controller_->outImage()) {
+        imageWidth = controller_->outImage()->width;
+        imageHeight = controller_->outImage()->height;
+    }
+
+    if (imageWidth != lastImageWidth_ || imageHeight != lastImageHeight_) {
+        lastImageWidth_ = imageWidth;
+        lastImageHeight_ = imageHeight;
+        if (zoomScale_ != 1.0) {
+            zoomScale_ = 1.0;
+            emit zoomScaleChanged();
+        }
+        if (panOffsetX_ != 0.0 || panOffsetY_ != 0.0) {
+            panOffsetX_ = 0.0;
+            panOffsetY_ = 0.0;
+            emit panOffsetChanged();
+        }
+    }
     update();
 }

@@ -1,6 +1,7 @@
 #include "ImageProcessorCore.h"
 #include <cmath>
 #include <algorithm>
+#include <limits>
 #include <numeric>
 
 // Luminance formula: Y = 0.299*R + 0.587*G + 0.114*B
@@ -23,20 +24,25 @@ inline int clampIdx(int v, int maxExcl) {
 inline uint8_t px(const ImageBuffer& img, int x, int y, int c) {
     x = clampIdx(x, img.width);
     y = clampIdx(y, img.height);
-    return img.data[(y * img.width + x) * 3 + c];
+    return img.data[(y * img.width + x) * img.channels + c];
 }
 
 // Write pixel channel c at (x,y) in dst (already sized correctly)
 inline void setPx(ImageBuffer& img, int x, int y, int c, uint8_t v) {
-    img.data[(y * img.width + x) * 3 + c] = v;
+    img.data[(y * img.width + x) * img.channels + c] = v;
 }
 
-// Resize dst to match src (same width, height, channels=3), zero-fill
+// Resize dst to match src, zero-fill RGB, and preserve alpha when present.
 inline void resizeDst(const ImageBuffer& src, ImageBuffer& dst) {
     dst.width = src.width;
     dst.height = src.height;
-    dst.channels = 3;
-    dst.data.assign(src.width * src.height * 3, 0);
+    dst.channels = src.channels;
+    dst.data.assign(src.width * src.height * src.channels, 0);
+    if (src.channels >= 4) {
+        for (int y = 0; y < src.height; ++y)
+            for (int x = 0; x < src.width; ++x)
+                setPx(dst, x, y, 3, px(src, x, y, 3));
+    }
 }
 
 // 1D Gaussian kernel (normalized), size must be odd
@@ -259,36 +265,117 @@ bool ImageProcessorCore::apply(const ImageBuffer& src, ImageBuffer& dst,
         if (mode == "H") {
             for (int y = 0; y < H; ++y)
                 for (int x = 0; x < W; ++x)
-                    for (int c = 0; c < 3; ++c)
+                    for (int c = 0; c < src.channels; ++c)
                         setPx(dst, x, y, c, px(src, W - 1 - x, y, c));
         } else if (mode == "V") {
             for (int y = 0; y < H; ++y)
                 for (int x = 0; x < W; ++x)
-                    for (int c = 0; c < 3; ++c)
+                    for (int c = 0; c < src.channels; ++c)
                         setPx(dst, x, y, c, px(src, x, H - 1 - y, c));
         } else { // "Both"
             for (int y = 0; y < H; ++y)
                 for (int x = 0; x < W; ++x)
-                    for (int c = 0; c < 3; ++c)
+                    for (int c = 0; c < src.channels; ++c)
                         setPx(dst, x, y, c, px(src, W - 1 - x, H - 1 - y, c));
         }
         break;
     }
     case 8: { // Rotate
         double degree = params.value("degree", 30.0).toDouble();
-        double cx = (W - 1) / 2.0, cy = (H - 1) / 2.0;
-        double angle_rad = -degree * M_PI / 180.0;
-        double cosA = std::cos(angle_rad), sinA = std::sin(angle_rad);
-        for (int dy = 0; dy < H; ++dy) {
-            for (int dx = 0; dx < W; ++dx) {
-                double tx = dx - cx, ty = dy - cy;
-                double sx = tx * cosA - ty * sinA + cx;
-                double sy = tx * sinA + ty * cosA + cy;
+        double angleRad = -degree * M_PI / 180.0;
+        double cosA = std::cos(angleRad), sinA = std::sin(angleRad);
+        auto normalizeTrig = [](double v) {
+            if (std::abs(v) < 1e-12)
+                return 0.0;
+            if (std::abs(v - 1.0) < 1e-12)
+                return 1.0;
+            if (std::abs(v + 1.0) < 1e-12)
+                return -1.0;
+            return v;
+        };
+        cosA = normalizeTrig(cosA);
+        sinA = normalizeTrig(sinA);
+        auto forwardX = [&](double x, double y, double cx, double cy) {
+            double tx = x - cx, ty = y - cy;
+            return tx * cosA + ty * sinA;
+        };
+        auto forwardY = [&](double x, double y, double cx, double cy) {
+            double tx = x - cx, ty = y - cy;
+            return -tx * sinA + ty * cosA;
+        };
+
+        double srcCx = (W - 1) / 2.0, srcCy = (H - 1) / 2.0;
+        double minBx = std::numeric_limits<double>::max();
+        double minBy = std::numeric_limits<double>::max();
+        double maxBx = std::numeric_limits<double>::lowest();
+        double maxBy = std::numeric_limits<double>::lowest();
+        bool hasBounds = false;
+
+        auto includeCorner = [&](double x, double y) {
+            double rx = forwardX(x, y, srcCx, srcCy);
+            double ry = forwardY(x, y, srcCx, srcCy);
+            minBx = std::min(minBx, rx);
+            minBy = std::min(minBy, ry);
+            maxBx = std::max(maxBx, rx);
+            maxBy = std::max(maxBy, ry);
+        };
+
+        if (src.channels >= 4) {
+            int minX = W, minY = H, maxX = -1, maxY = -1;
+            for (int y = 0; y < H; ++y)
+                for (int x = 0; x < W; ++x)
+                    if (px(src, x, y, 3) != 0) {
+                        minX = std::min(minX, x);
+                        minY = std::min(minY, y);
+                        maxX = std::max(maxX, x);
+                        maxY = std::max(maxY, y);
+                    }
+
+            if (maxX >= minX && maxY >= minY) {
+                srcCx = (minX + maxX) / 2.0;
+                srcCy = (minY + maxY) / 2.0;
+                for (int y = minY; y <= maxY; ++y)
+                    for (int x = minX; x <= maxX; ++x)
+                        if (px(src, x, y, 3) != 0) {
+                            includeCorner(x - 0.5, y - 0.5);
+                            includeCorner(x + 0.5, y - 0.5);
+                            includeCorner(x - 0.5, y + 0.5);
+                            includeCorner(x + 0.5, y + 0.5);
+                            hasBounds = true;
+                        }
+            }
+        }
+
+        if (!hasBounds) {
+            includeCorner(-0.5, -0.5);
+            includeCorner(W - 0.5, -0.5);
+            includeCorner(-0.5, H - 0.5);
+            includeCorner(W - 0.5, H - 0.5);
+        }
+
+        int outW = std::max(1, static_cast<int>(std::ceil(maxBx - minBx)));
+        int outH = std::max(1, static_cast<int>(std::ceil(maxBy - minBy)));
+
+        // Always output RGBA: corners outside source stay (0,0,0,0) = transparent,
+        // letting the viewport shader composite them over the background colour.
+        dst.width = outW;
+        dst.height = outH;
+        dst.channels = 4;
+        dst.data.assign(outW * outH * 4, 0);
+
+        for (int dy = 0; dy < outH; ++dy) {
+            for (int dx = 0; dx < outW; ++dx) {
+                double tx = minBx + dx + 0.5;
+                double ty = minBy + dy + 0.5;
+                double sx = tx * cosA - ty * sinA + srcCx;
+                double sy = tx * sinA + ty * cosA + srcCy;
                 int sx_i = static_cast<int>(std::round(sx));
                 int sy_i = static_cast<int>(std::round(sy));
                 if (sx_i >= 0 && sx_i < W && sy_i >= 0 && sy_i < H) {
                     for (int c = 0; c < 3; ++c)
                         setPx(dst, dx, dy, c, px(src, sx_i, sy_i, c));
+                    uint8_t a = (src.channels >= 4) ? px(src, sx_i, sy_i, 3) : 255;
+                    setPx(dst, dx, dy, 3, a);
                 }
             }
         }

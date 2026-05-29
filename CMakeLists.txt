@@ -63,4 +63,35 @@ if(Qt6Test_FOUND)
     target_include_directories(tst_ImageProcessorCore PRIVATE include)
     target_link_libraries(tst_ImageProcessorCore PRIVATE Qt6::Core Qt6::Test)
     add_test(NAME tst_ImageProcessorCore COMMAND tst_ImageProcessorCore)
+
+    qt_add_executable(tst_ImageIoService
+        tests/tst_ImageIoService.cpp
+        include/ImageIoService.h
+        src/ImageIoService.cpp
+        include/ImageBuffer.h
+    )
+    target_include_directories(tst_ImageIoService PRIVATE include)
+    target_compile_definitions(tst_ImageIoService PRIVATE TEST_IMAGE_PATH="${CMAKE_CURRENT_SOURCE_DIR}/ui_template/desktop.webp")
+    target_link_libraries(tst_ImageIoService PRIVATE Qt6::Core Qt6::Gui Qt6::Test)
+    add_test(NAME tst_ImageIoService COMMAND tst_ImageIoService)
+    set_tests_properties(tst_ImageIoService PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+    qt_add_executable(tst_ProcessingController
+        tests/tst_ProcessingController.cpp
+        include/EditCommand.h
+        include/AlgorithmModel.h
+        src/AlgorithmModel.cpp
+        include/ImageBuffer.h
+        include/ImageIoService.h
+        src/ImageIoService.cpp
+        include/ProcessingController.h
+        src/ProcessingController.cpp
+        include/ImageProcessorCore.h
+        src/ImageProcessorCore.cpp
+    )
+    target_include_directories(tst_ProcessingController PRIVATE include)
+    target_compile_definitions(tst_ProcessingController PRIVATE TEST_IMAGE_PATH="${CMAKE_CURRENT_SOURCE_DIR}/ui_template/desktop.webp")
+    target_link_libraries(tst_ProcessingController PRIVATE Qt6::Core Qt6::Gui Qt6::Qml Qt6::Test)
+    add_test(NAME tst_ProcessingController COMMAND tst_ProcessingController)
+    set_tests_properties(tst_ProcessingController PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 endif()
