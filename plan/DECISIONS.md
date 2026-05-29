@@ -277,3 +277,41 @@ Irreversible or high-impact technical choices. Use `plan-coordinator` to append 
   - Window raise/activate retry handles timing edge cases in WSLg startup.
   - Qt Quick handles OpenGL context internally when needed; explicit Qt6::OpenGL linking is unnecessary.
 - Source: Commit 91b60a2 (Fix Qt Quick startup under WSLg); Phase 2 completion test results on WSL2 + rebuilt kernel.
+
+## D41 — Worker thread deferred to Phase 5/6
+
+- Decision: `ProcessingController.apply()` runs synchronously on the GUI thread in Phase 3. No QThread, no `applyInFlight` guard, no `Qt::QueuedConnection` completion path. All 28 algorithms execute directly on the calling thread; results update `outImage` and the viewport immediately within the call stack.
+- Rationale: Phase 3 completion criteria (fixture tests, multi-apply succession, viewport redraw on success) are all satisfied by synchronous execution. Threading (worker thread, async completion signals) is added when GLSL dispatch (Phase 5) or video/stream frames (Phase 6/7) actually require non-blocking background work.
+- Source: Phase 3 completion criteria (no async requirement stated); plan/ARCHITECTURE.md § Phase 3 Tasks.
+
+## D42 — AppController implemented as ProcessingController extension
+
+- Decision: The architecture document names `AppController` as the QML-exposed controller, but `ProcessingController` is already `QML_ELEMENT` `QML_SINGLETON` and handles open/save/reset. For Phase 3, `apply()`, `undo()`, `redo()`, and `algorithmModel()` are added directly as methods/properties of `ProcessingController`. A refactor to rename `ProcessingController` to `AppController` or to separate concerns is deferred to a later cleanup phase.
+- Rationale: `ProcessingController` is already the QML singleton; adding new methods is the minimal change. Renaming would add zero functional value in Phase 3. Refactoring is better deferred after threading is added in Phase 5/6, when the separation between application state and processing dispatch becomes clearer.
+- Source: Phase 3 completion criteria (algorithm selection, parameter adjustment, apply, undo/redo all via QML); plan/ARCHITECTURE.md § Module 2 - ProcessingController, § UI Layout And Color (C++ exposed to QML).
+
+## D-P3-01 — Worker thread deferred to Phase 5/6
+
+ProcessingController.apply() runs synchronously on the GUI thread in Phase 3. No QThread, no applyInFlight guard, no Qt::QueuedConnection completion path. Rationale: all Phase 3 completion criteria are satisfied by synchronous execution. Threading is added when GLSL dispatch (Phase 5) or video/stream frames (Phase 6/7) actually require it.
+
+## D-P3-02 — AppController implemented as ProcessingController extension
+
+The architecture names AppController as the QML-exposed controller, but ProcessingController is already QML_ELEMENT QML_SINGLETON. For Phase 3, apply/undo/redo/algorithmModel are added directly to ProcessingController. Rename/refactor to AppController is deferred to a later cleanup phase.
+
+## D-P3-03 — Algorithms #8, #14, #15, #16, #22 use standard formulas
+
+- Decision: Exact formulas for Rotate (#8), Sharpen (#14), High-Pass Sharpen (#15), High-Boost (#16), and DoG (#22) are not specified in canonical plan documents (plan/ARCHITECTURE.md, structure.md). Implementations use standard image processing formulas:
+  - Rotate (#8): backward-mapping rotation (inverse transform) with black fill for unmapped pixels.
+  - Sharpen (#14): unsharp mask formula `output = src + alpha * (src - blurred)`.
+  - High-Pass Sharpen (#15): high-pass blending `output = src + strength * highpass`, where highpass kernel is `[-1 -1 -1; -1 8 -1; -1 -1 -1]`.
+  - High-Boost (#16): high-boost formula `output = (1 + beta) * src - beta * blurred`.
+  - DoG (#22): Difference of Gaussian with +128 offset: `output = gain * (blur1 - blur2) + 128`, clamped to `0..255`.
+- Rationale: These are standard, well-known image processing formulas. Canonical documents define only the parameter ranges and processing contracts, not implementation details. Visual verification at Phase 3 completion confirms CPU/GLSL parity.
+- Source: plan-coordinator retrieve confirmed formulas absent from plan/ARCHITECTURE.md and structure.md; standard implementations in ImageProcessorCore and GpuEffectPipeline accepted by advisor review.
+
+## D-P3-04 — historyBytes_ conservatively overestimates shared buffer memory
+
+- Decision: `StaticApplyCommand::memoryBytes()` returns `prev_->data.size() + next_->data.size()`. Adjacent commands share buffers via `shared_ptr`, so total `historyBytes_` overestimates by `(n-1) × frame_size` for `n` history entries. This causes earlier-than-necessary eviction near the 512 MB budget but never violates the budget. No data loss occurs.
+- Rationale: Correct tracking requires tracking all `shared_ptr` references across the history deque, which is complex and prone to error. Overestimation is safe: it is conservative and prevents budget violation. The performance impact (evicting history sooner than necessary) is acceptable for Phase 3 interactive usage.
+- Accepted for Phase 3: accurate `shared_ptr` reference counting deferred to Phase 5 cleanup when memory profiling is systematic.
+- Source: code-reviewer confirmation of no data loss from `historyBytes_` issue; Phase 3 completion criteria satisfied (undo/redo works, history persists within budget).

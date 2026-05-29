@@ -28,6 +28,7 @@ Before non-trivial Codex writer delegation, classify the work and choose the sma
 | Low-risk bounded task | 1 `codex-writer-small` when behavior, target files/symbols, constraints, and verification are explicit |
 | High-risk coupled task | 1 `codex-writer-large` when bounded multi-file work needs deeper reasoning to keep architecture, ownership, lifetime, threading, or public API coherent |
 | Independent split | 2-3 writers for independent short scopes without overlapping files |
+| Type-gated parallel | Main Model writes shared type headers directly first, then spawns multiple parallel writers for packages that depend only on those types (not each other's implementation) |
 | Sequential split | Sequential writers when each result defines the next safe edit boundary |
 | Ambiguous | Gather more facts before invoking writers |
 

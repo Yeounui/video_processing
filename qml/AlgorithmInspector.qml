@@ -1,15 +1,19 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import QtUi 1.0
 
 Rectangle {
+    id: root
     color: "#F8F8F5"
+
+    property int selectedAlgorithmId: -1
+    property var selectedParams: []
 
     ColumnLayout {
         anchors.fill: parent
         spacing: 0
 
-        // Category tabs
         Rectangle {
             Layout.fillWidth: true
             height: 40
@@ -18,17 +22,24 @@ Rectangle {
             border.width: 1
 
             Row {
-                anchors { fill: parent; leftMargin: 8; rightMargin: 8; topMargin: 6; bottomMargin: 6 }
+                anchors {
+                    fill: parent
+                    leftMargin: 8
+                    rightMargin: 8
+                    topMargin: 6
+                    bottomMargin: 6
+                }
                 spacing: 4
 
                 Repeater {
                     model: ["Point", "Geometry", "Filter", "Edge", "Morphology", "Grayscale"]
+
                     delegate: Rectangle {
                         width: tabLabel.implicitWidth + 12
                         height: 28
-                        color: index === 0 ? "#6F86AB" : "#FFFFFF"
                         radius: 4
-                        border.color: index === 0 ? "transparent" : "#E5E8EB"
+                        color: ProcessingController.algorithmModel.category === modelData ? "#6F86AB" : "#FFFFFF"
+                        border.color: ProcessingController.algorithmModel.category === modelData ? "transparent" : "#E5E8EB"
                         border.width: 1
 
                         Text {
@@ -36,27 +47,97 @@ Rectangle {
                             anchors.centerIn: parent
                             text: modelData
                             font.pixelSize: 12
-                            color: index === 0 ? "#FFFFFF" : "#2F3438"
+                            color: ProcessingController.algorithmModel.category === modelData ? "#FFFFFF" : "#2F3438"
+                        }
+
+                        MouseArea {
+                            anchors.fill: parent
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: {
+                                ProcessingController.algorithmModel.category = modelData
+                                root.selectedAlgorithmId = -1
+                                root.selectedParams = []
+                            }
                         }
                     }
                 }
             }
         }
 
-        // Algorithm list (empty state)
-        Item {
+        ListView {
+            id: algorithmList
             Layout.fillWidth: true
             Layout.fillHeight: true
+            clip: true
+            model: ProcessingController.algorithmModel
+            boundsBehavior: Flickable.StopAtBounds
 
-            Text {
-                anchors.centerIn: parent
-                text: "No algorithms loaded"
-                font.pixelSize: 13
-                color: "#6E747A"
+            delegate: Rectangle {
+                id: algorithmDelegate
+                width: ListView.view.width
+                height: 38
+                color: root.selectedAlgorithmId === model.id ? "#DDEEF4"
+                       : hoverHandler.hovered ? "#F0F4F8"
+                       : "#F8F8F5"
+
+                Text {
+                    anchors {
+                        left: parent.left
+                        right: parent.right
+                        verticalCenter: parent.verticalCenter
+                        leftMargin: 14
+                        rightMargin: 14
+                    }
+                    text: model.name
+                    color: "#2F3438"
+                    font.pixelSize: 13
+                    elide: Text.ElideRight
+                }
+
+                HoverHandler {
+                    id: hoverHandler
+                }
+
+                MouseArea {
+                    anchors.fill: parent
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: {
+                        root.selectedAlgorithmId = model.id
+                        root.selectedParams = model.params
+                    }
+                }
+            }
+
+            ScrollBar.vertical: ScrollBar {}
+        }
+
+        Rectangle {
+            Layout.fillWidth: true
+            visible: root.selectedAlgorithmId > 0 && root.selectedParams.length > 0
+            implicitHeight: visible ? Math.min(220, paramContent.implicitHeight + 24) : 0
+            color: "#FFFFFF"
+            border.color: "#E5E8EB"
+            border.width: 1
+
+            ScrollView {
+                anchors.fill: parent
+                anchors.margins: 12
+                clip: true
+
+                ParameterEditor {
+                    id: paramEditor
+                    width: parent.width
+                    paramSpecs: root.selectedParams
+                }
+            }
+
+            Item {
+                id: paramContent
+                visible: false
+                implicitHeight: paramEditor.implicitHeight
             }
         }
 
-        // Apply / Reset row
         Rectangle {
             Layout.fillWidth: true
             height: 56
@@ -65,20 +146,28 @@ Rectangle {
             border.width: 1
 
             RowLayout {
-                anchors { fill: parent; margins: 10 }
+                anchors {
+                    fill: parent
+                    margins: 10
+                }
                 spacing: 8
 
                 Button {
+                    id: applyButton
                     Layout.fillWidth: true
                     text: "Apply"
+                    enabled: root.selectedAlgorithmId > 0 && ProcessingController.hasImage
                     implicitHeight: 32
+                    onClicked: ProcessingController.applyAlgorithm(root.selectedAlgorithmId, paramEditor.paramValues)
+
                     background: Rectangle {
-                        color: "#6F86AB"
+                        color: applyButton.enabled ? "#6F86AB" : "#D8DDE3"
                         radius: 6
                     }
+
                     contentItem: Text {
-                        text: parent.text
-                        color: "#FFFFFF"
+                        text: applyButton.text
+                        color: applyButton.enabled ? "#FFFFFF" : "#6E747A"
                         font.pixelSize: 13
                         horizontalAlignment: Text.AlignHCenter
                         verticalAlignment: Text.AlignVCenter
@@ -86,18 +175,71 @@ Rectangle {
                 }
 
                 Button {
+                    id: undoButton
                     Layout.preferredWidth: 72
-                    text: "Reset"
+                    text: "Undo"
+                    enabled: ProcessingController.canUndo
                     implicitHeight: 32
+                    onClicked: ProcessingController.undo()
+
                     background: Rectangle {
                         color: "transparent"
-                        border.color: "#E5E8EB"
+                        border.color: undoButton.enabled ? "#C8D0D8" : "#E5E8EB"
                         border.width: 1
                         radius: 6
                     }
+
                     contentItem: Text {
-                        text: parent.text
-                        color: "#2F3438"
+                        text: undoButton.text
+                        color: undoButton.enabled ? "#2F3438" : "#9AA1A8"
+                        font.pixelSize: 13
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
+                    }
+                }
+
+                Button {
+                    id: redoButton
+                    Layout.preferredWidth: 72
+                    text: "Redo"
+                    enabled: ProcessingController.canRedo
+                    implicitHeight: 32
+                    onClicked: ProcessingController.redo()
+
+                    background: Rectangle {
+                        color: "transparent"
+                        border.color: redoButton.enabled ? "#C8D0D8" : "#E5E8EB"
+                        border.width: 1
+                        radius: 6
+                    }
+
+                    contentItem: Text {
+                        text: redoButton.text
+                        color: redoButton.enabled ? "#2F3438" : "#9AA1A8"
+                        font.pixelSize: 13
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
+                    }
+                }
+
+                Button {
+                    id: resetButton
+                    Layout.preferredWidth: 72
+                    text: "Reset"
+                    enabled: ProcessingController.hasImage
+                    implicitHeight: 32
+                    onClicked: ProcessingController.reset()
+
+                    background: Rectangle {
+                        color: "transparent"
+                        border.color: resetButton.enabled ? "#C8D0D8" : "#E5E8EB"
+                        border.width: 1
+                        radius: 6
+                    }
+
+                    contentItem: Text {
+                        text: resetButton.text
+                        color: resetButton.enabled ? "#2F3438" : "#9AA1A8"
                         font.pixelSize: 13
                         horizontalAlignment: Text.AlignHCenter
                         verticalAlignment: Text.AlignVCenter

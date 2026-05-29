@@ -22,18 +22,24 @@ qt_add_qml_module(qt_ui
         qml/SourcePanel.qml
         qml/ProcessingViewport.qml
         qml/AlgorithmInspector.qml
+        qml/ParameterEditor.qml
         qml/BottomTransport.qml
     SOURCES
-        src/ImageBuffer.h
-        src/ImageIoService.h
+        include/EditCommand.h
+        include/AlgorithmModel.h
+        src/AlgorithmModel.cpp
+        include/ImageBuffer.h
+        include/ImageIoService.h
         src/ImageIoService.cpp
-        src/ProcessingController.h
+        include/ProcessingController.h
         src/ProcessingController.cpp
-        src/ProcessingViewportItem.h
+        include/ProcessingViewportItem.h
         src/ProcessingViewportItem.cpp
+        include/ImageProcessorCore.h
+        src/ImageProcessorCore.cpp
 )
 
-target_include_directories(qt_ui PRIVATE src)
+target_include_directories(qt_ui PRIVATE include)
 
 target_link_libraries(qt_ui
     PRIVATE
@@ -43,3 +49,18 @@ target_link_libraries(qt_ui
         Qt6::Quick
         Qt6::QuickControls2
 )
+
+# ImageProcessorCore unit tests
+find_package(Qt6 OPTIONAL_COMPONENTS Test)
+if(Qt6Test_FOUND)
+    enable_testing()
+    qt_add_executable(tst_ImageProcessorCore
+        tests/tst_ImageProcessorCore.cpp
+        include/ImageProcessorCore.h
+        src/ImageProcessorCore.cpp
+        include/ImageBuffer.h
+    )
+    target_include_directories(tst_ImageProcessorCore PRIVATE include)
+    target_link_libraries(tst_ImageProcessorCore PRIVATE Qt6::Core Qt6::Test)
+    add_test(NAME tst_ImageProcessorCore COMMAND tst_ImageProcessorCore)
+endif()

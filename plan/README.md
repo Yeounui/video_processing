@@ -7,7 +7,7 @@ Current status entry point and canonical document map. Other plan documents are 
 - Overall: **generated** — Phase 1 (Qt Quick) verified, Phase 2 (Static image) generated. ImageBuffer, ImageIoService, ProcessingController, and minimal viewport (GL_NEAREST + letterbox) implementation complete and building without errors.
 - Phase 1 (Qt Quick application skeleton): **verified** — CMakeLists.txt configured for Qt6 Core/Gui/Qml/Quick/QuickControls2; qt_add_qml_module(qt_ui URI "QtUi" VERSION 1.0); QML shell created.
 - Phase 2 (Static image basic workflow): **generated** — ImageBuffer (RGB888), ImageIoService (Qt image IO with D30 format normalization), ProcessingController image state (inImage/outImage shared_ptr per D39), minimal viewport (QSGSimpleTextureNode GL_NEAREST + letterbox per D29), error preservation (D30), reset semantics (D21), save gating (D9).
-- Phase 3 (28 CPU reference algorithms): pending.
+- Phase 3 (28 CPU reference algorithms): **generated** — Package A (28 algorithms, 23 tests pass) and Package B (AlgorithmModel, EditCommand, undo/redo, QML wiring) complete. Build clean (0 errors). Visual interactive verification pending user test.
 - Phase 4 (QML OpenGL viewport): pending.
 - Phase 5 (GLSL effect pipeline): pending.
 - Phase 6 (Video file input): pending.

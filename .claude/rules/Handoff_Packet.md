@@ -4,6 +4,11 @@ description: Required handoff packet fields and per-mode query templates for all
 
 # Agent Handoff Packet
 
+**Team member response protocol:** An agent's plain text output is not delivered back to the team lead — only `SendMessage` calls are. When a response is required from any team member, include this line at the top of the message:
+```
+IMPORTANT: Reply using SendMessage addressed to "team-lead".
+```
+
 When invoking an agent, provide the fields relevant to that agent.
 
 | Field | Applies To | Content |
