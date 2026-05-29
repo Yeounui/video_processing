@@ -1,0 +1,32 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash /home/seuoh/workspace/qt_ui/.claude/hooks/check_conda_activation.sh"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/home/seuoh/miniforge3/bin/conda run -n videoprocess cmake --build /home/seuoh/workspace/qt_ui/build 2>/dev/null || true",
+            "statusMessage": "Building..."
+          }
+        ]
+      }
+    ]
+  },
+  "enabledPlugins": {
+    "qt-development-skills@claude-plugins-official": true
+  },
+  "env": {
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
+  }
+}
