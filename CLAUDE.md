@@ -3,6 +3,13 @@
 - Document-editing language: English
 - Communication language with user via terminal: Korean
 
+## Required Reading On New Sessions
+
+1. `CLAUDE.md` (this file)
+2. `plan/README.md` - current status and canonical document map
+
+If `plan/README.md` does not exist, the plan has not been created yet. Invoke the `init-plan` skill before large implementation work.
+
 ## AI Orchestration Protocol
 
 For routine tasks, use the agent pipelines below to optimize token efficiency and cognitive clarity. The Main Model owns routing, planning judgment, conflict resolution, and design decisions; helper agents execute bounded roles. Prioritize successful execution over strict isolation.
@@ -59,16 +66,9 @@ When invoking an agent, follow `.claude/rules/Handoff_Packet.md` for required fi
 
 Keep this file as a lightweight router. Do not duplicate canonical plan facts, root specs, architecture tables, phase details, algorithm catalogs, or long constraints here.
 
-Main Model may read `plan/README.md` directly as the status and document-map entry point. Do not directly read any other `plan/*.md` file, `plan.md`, or `structure.md`; request the needed facts through `plan-coordinator`. If `plan/README.md` does not exist, use the `init-plan` skill.
+Main Model may read `plan/README.md` directly as the status and document-map entry point. Do not directly read any other `plan/*.md` file, `plan.md`, or `structure.md`; Must request the needed facts through `plan-coordinator`.
 
 Canonical document placement is defined in `.claude/rules/Edit_Workflow.md`.
-
-## Required Reading On New Sessions
-
-1. `CLAUDE.md` (this file)
-2. `plan/README.md` - current status and canonical document map
-
-If `plan/README.md` does not exist, the plan has not been created yet. Invoke the `init-plan` skill before large implementation work.
 
 ## Rules
 

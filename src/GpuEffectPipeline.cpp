@@ -1,5 +1,4 @@
 #include "GpuEffectPipeline.h"
-#include <QOpenGLShaderProgram>
 #include <QDebug>
 #include <cmath>
 
@@ -507,32 +506,53 @@ GLuint GpuEffectPipeline::getOrCompileProgram(int algorithmId) {
         return 0;
     }
 
-    QOpenGLShaderProgram prog;
-    if (!prog.addShaderFromSourceCode(QOpenGLShader::Vertex, vertShaderSrc)) {
-        qWarning() << "GpuEffectPipeline: Vertex shader compile failed for algorithm" << algorithmId
-                   << ":" << prog.log();
+    auto compileShader = [&](GLenum type, const char *src) -> GLuint {
+        GLuint s = gl_.glCreateShader(type);
+        gl_.glShaderSource(s, 1, &src, nullptr);
+        gl_.glCompileShader(s);
+        GLint ok = 0;
+        gl_.glGetShaderiv(s, GL_COMPILE_STATUS, &ok);
+        if (!ok) {
+            GLint len = 0;
+            gl_.glGetShaderiv(s, GL_INFO_LOG_LENGTH, &len);
+            QByteArray log(len, '\0');
+            gl_.glGetShaderInfoLog(s, len, nullptr, log.data());
+            qWarning() << "GpuEffectPipeline: shader compile failed (alg" << algorithmId
+                       << ", type" << type << "):" << log;
+            gl_.glDeleteShader(s);
+            return 0;
+        }
+        return s;
+    };
+
+    GLuint vs = compileShader(GL_VERTEX_SHADER, vertShaderSrc);
+    if (!vs) { programs_[algorithmId].failed = true; return 0; }
+
+    GLuint fs = compileShader(GL_FRAGMENT_SHADER, fragSrc);
+    if (!fs) { gl_.glDeleteShader(vs); programs_[algorithmId].failed = true; return 0; }
+
+    GLuint prog = gl_.glCreateProgram();
+    gl_.glAttachShader(prog, vs);
+    gl_.glAttachShader(prog, fs);
+    gl_.glLinkProgram(prog);
+    gl_.glDeleteShader(vs);
+    gl_.glDeleteShader(fs);
+
+    GLint linked = 0;
+    gl_.glGetProgramiv(prog, GL_LINK_STATUS, &linked);
+    if (!linked) {
+        GLint len = 0;
+        gl_.glGetProgramiv(prog, GL_INFO_LOG_LENGTH, &len);
+        QByteArray log(len, '\0');
+        gl_.glGetProgramInfoLog(prog, len, nullptr, log.data());
+        qWarning() << "GpuEffectPipeline: shader link failed (alg" << algorithmId << "):" << log;
+        gl_.glDeleteProgram(prog);
         programs_[algorithmId].failed = true;
         return 0;
     }
 
-    if (!prog.addShaderFromSourceCode(QOpenGLShader::Fragment, fragSrc)) {
-        qWarning() << "GpuEffectPipeline: Fragment shader compile failed for algorithm" << algorithmId
-                   << ":" << prog.log();
-        programs_[algorithmId].failed = true;
-        return 0;
-    }
-
-    if (!prog.link()) {
-        qWarning() << "GpuEffectPipeline: Shader link failed for algorithm" << algorithmId
-                   << ":" << prog.log();
-        programs_[algorithmId].failed = true;
-        return 0;
-    }
-
-    GLuint progId = prog.programId();
-    programs_[algorithmId] = Program{progId, false};
-    prog.release();  // Release ownership; we now own the program via GL handle
-    return progId;
+    programs_[algorithmId] = Program{prog, false};
+    return prog;
 }
 
 void GpuEffectPipeline::setUniforms(GLuint prog, int algorithmId, const QVariantMap &params, int w, int h) {
