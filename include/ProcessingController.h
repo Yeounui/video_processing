@@ -2,6 +2,7 @@
 
 #include "EditCommand.h"
 #include "ImageBuffer.h"
+#include "VideoInputService.h"
 #include <deque>
 #include <vector>
 #include <QObject>
@@ -12,7 +13,6 @@
 #include <memory>
 
 class AlgorithmModel;
-class VideoInputService;
 
 class ProcessingController : public QObject {
     Q_OBJECT
@@ -28,9 +28,11 @@ class ProcessingController : public QObject {
     Q_PROPERTY(int imageHeight READ imageHeight NOTIFY sourceChanged)
     // Video properties
     Q_PROPERTY(bool isVideoSource READ isVideoSource NOTIFY sourceChanged)
+    Q_PROPERTY(bool isStreamSource READ isStreamSource NOTIFY sourceChanged)
     Q_PROPERTY(bool videoPlaying READ videoPlaying NOTIFY videoPlayingChanged)
     Q_PROPERTY(double videoDuration READ videoDuration NOTIFY sourceChanged)
     Q_PROPERTY(double videoPosition READ videoPosition NOTIFY videoPositionChanged)
+    Q_PROPERTY(int streamStatus READ streamStatus NOTIFY streamStatusChanged)
     Q_PROPERTY(int effectStackSize READ effectStackSize NOTIFY effectStackChanged)
 
 public:
@@ -47,9 +49,11 @@ public:
     int imageWidth() const;
     int imageHeight() const;
     bool isVideoSource() const;
+    bool isStreamSource() const;
     bool videoPlaying() const;
     double videoDuration() const;
     double videoPosition() const;
+    int streamStatus() const;
     int effectStackSize() const;
 
     // Public (non-QML) accessors
@@ -81,6 +85,9 @@ public:
     Q_INVOKABLE void seekVideo(double secs);
     Q_INVOKABLE void setVideoLoop(bool loop);
     Q_INVOKABLE void setVideoSpeed(double speed);
+    Q_INVOKABLE void openStream(const QString &url);
+    Q_INVOKABLE void disconnectStream();
+    Q_INVOKABLE void reconnectStream();
 
     // Effect stack (video/stream mode, max 3 entries)
     Q_INVOKABLE bool appendEffect(int algorithmId, const QVariantMap &params);
@@ -98,12 +105,14 @@ signals:
     // Video signals
     void videoPlayingChanged();
     void videoPositionChanged(double secs);
+    void streamStatusChanged();
     void effectStackChanged();
 
 private slots:
     void onVideoFrame(std::shared_ptr<ImageBuffer> frame);
     void onVideoPosition(double secs);
     void onVideoPlaybackFinished();
+    void onStreamStatusChanged(VideoInputService::StreamStatus status);
 
 private:
     void clearHistory();

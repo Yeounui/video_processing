@@ -14,9 +14,27 @@ Rectangle {
         return m + ":" + (sec < 10 ? "0" + sec : sec)
     }
 
+    function streamStatusText(status) {
+        if (status === 1)
+            return "Connecting"
+        if (status === 2)
+            return "Connected"
+        if (status === 3)
+            return "Reconnecting"
+        return "Disconnected"
+    }
+
+    function streamStatusColor(status) {
+        if (status === 2)
+            return "#4F8A67"
+        if (status === 1 || status === 3)
+            return "#B9823A"
+        return "#A84E4E"
+    }
+
     // Static stub (shown when no video)
     RowLayout {
-        visible: !ProcessingController.isVideoSource
+        visible: !ProcessingController.isVideoSource && !ProcessingController.isStreamSource
         anchors { fill: parent; leftMargin: 12; rightMargin: 12 }
         spacing: 8
         Rectangle { width: 8; height: 8; radius: 4; color: "#8FA9C4" }
@@ -113,6 +131,82 @@ Rectangle {
             visible: ProcessingController.effectStackSize > 0
             text: "FX:" + ProcessingController.effectStackSize + "/3"
             font.pixelSize: 11; color: "#6F86AB"
+        }
+    }
+
+    // Stream transport (shown when realtime stream source is active)
+    RowLayout {
+        visible: ProcessingController.isStreamSource
+        anchors { fill: parent; leftMargin: 12; rightMargin: 12 }
+        spacing: 8
+
+        Rectangle {
+            width: 8
+            height: 8
+            radius: 4
+            color: streamStatusColor(ProcessingController.streamStatus)
+        }
+
+        Text {
+            text: streamStatusText(ProcessingController.streamStatus)
+            font.pixelSize: 12
+            color: "#2F3438"
+            Layout.preferredWidth: 92
+        }
+
+        Text {
+            text: ProcessingController.sourceFileName
+            elide: Text.ElideMiddle
+            font.pixelSize: 12
+            color: "#6E747A"
+            Layout.fillWidth: true
+        }
+
+        Text {
+            visible: ProcessingController.effectStackSize > 0
+            text: "FX:" + ProcessingController.effectStackSize + "/3"
+            font.pixelSize: 11
+            color: "#6F86AB"
+        }
+
+        Button {
+            text: "Reconnect"
+            implicitHeight: 28
+            enabled: ProcessingController.streamStatus !== 1 && ProcessingController.streamStatus !== 2
+            onClicked: ProcessingController.reconnectStream()
+            background: Rectangle {
+                color: "transparent"
+                border.color: parent.enabled ? "#6F86AB" : "#E5E8EB"
+                border.width: 1
+                radius: 4
+            }
+            contentItem: Text {
+                text: parent.text
+                font.pixelSize: 12
+                color: parent.enabled ? "#6F86AB" : "#B0B4B8"
+                horizontalAlignment: Text.AlignHCenter
+                verticalAlignment: Text.AlignVCenter
+            }
+        }
+
+        Button {
+            text: "Disconnect"
+            implicitHeight: 28
+            enabled: ProcessingController.streamStatus !== 0
+            onClicked: ProcessingController.disconnectStream()
+            background: Rectangle {
+                color: "transparent"
+                border.color: parent.enabled ? "#A84E4E" : "#E5E8EB"
+                border.width: 1
+                radius: 4
+            }
+            contentItem: Text {
+                text: parent.text
+                font.pixelSize: 12
+                color: parent.enabled ? "#A84E4E" : "#B0B4B8"
+                horizontalAlignment: Text.AlignHCenter
+                verticalAlignment: Text.AlignVCenter
+            }
         }
     }
 }

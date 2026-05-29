@@ -31,6 +31,34 @@ Rectangle {
         onAccepted: ProcessingController.openVideo(selectedFile)
     }
 
+    Dialog {
+        id: streamDialog
+        title: "Open Stream"
+        modal: true
+        standardButtons: Dialog.Ok | Dialog.Cancel
+        anchors.centerIn: parent
+        onOpened: {
+            streamUrlField.forceActiveFocus()
+            streamUrlField.selectAll()
+        }
+        onAccepted: {
+            if (streamUrlField.text.trim().length > 0)
+                ProcessingController.openStream(streamUrlField.text.trim())
+        }
+
+        ColumnLayout {
+            spacing: 8
+            width: 380
+
+            TextField {
+                id: streamUrlField
+                Layout.fillWidth: true
+                placeholderText: "rtsp://, rtmp://, or http://"
+                selectByMouse: true
+            }
+        }
+    }
+
     RowLayout {
         anchors {
             fill: parent
@@ -79,16 +107,14 @@ Rectangle {
             Button {
                 text: "Open Stream"
                 implicitHeight: 34
-                enabled: false
+                onClicked: streamDialog.open()
                 background: Rectangle {
-                    color: "transparent"
-                    border.color: "#E5E8EB"
-                    border.width: 1
+                    color: "#6F86AB"
                     radius: 6
                 }
                 contentItem: Text {
                     text: parent.text
-                    color: "#B0B4B8"
+                    color: "#FFFFFF"
                     font.pixelSize: 13
                     horizontalAlignment: Text.AlignHCenter
                     verticalAlignment: Text.AlignVCenter

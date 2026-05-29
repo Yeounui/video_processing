@@ -3,7 +3,10 @@
 #include "ImageBuffer.h"
 #include <QObject>
 #include <QString>
+#include <atomic>
 #include <memory>
+#include <mutex>
+#include <thread>
 
 extern "C" {
 #include <libavformat/avformat.h>
@@ -19,6 +22,9 @@ class QTimer;
 class VideoInputService : public QObject {
     Q_OBJECT
 public:
+    enum class StreamStatus { Disconnected, Connecting, Connected, Reconnecting };
+    Q_ENUM(StreamStatus)
+
     explicit VideoInputService(QObject *parent = nullptr);
     ~VideoInputService() override;
 
@@ -26,6 +32,12 @@ public:
     bool open(const QString &path);  // true on success; emits errorOccurred on failure
     void close();
     bool isOpen() const;
+
+    bool openStream(const QString &url);
+    void closeStream();
+    bool isStream() const;
+    StreamStatus streamStatus() const;
+    void reconnectStream();
 
     // File metadata (valid after open())
     double durationSecs() const;
@@ -55,6 +67,7 @@ signals:
     void positionChanged(double secs);
     void playbackFinished();                              // EOF reached and loop is off
     void errorOccurred(const QString &message);
+    void streamStatusChanged(VideoInputService::StreamStatus status);
 
 private slots:
     void onTimerTick();
@@ -63,9 +76,14 @@ private:
     // Decode one frame and return it, or nullptr on EOF/error.
     // Uses avcodec_decode_video2 (FFmpeg 2.x API).
     std::shared_ptr<ImageBuffer> decodeNextFrame();
+    std::shared_ptr<ImageBuffer> toImageBuffer(AVFrame *f);
 
     // Seek to timestamp in seconds (flushes decoder buffers).
     void seekInternal(double secs);
+    void runStreamProducer();
+    void onDisplayTick();
+    void onStreamDisconnected();
+    void setStreamStatus(StreamStatus s);
 
     AVFormatContext *fmtCtx_   = nullptr;
     AVCodecContext  *codecCtx_ = nullptr;
@@ -80,4 +98,13 @@ private:
     double speed_           = 1.0;
 
     QTimer *playTimer_ = nullptr;
+    QString streamUrl_;
+    bool isStream_ = false;
+    StreamStatus streamStatus_ = StreamStatus::Disconnected;
+    std::thread producerThread_;
+    std::atomic<bool> stopProducer_{false};
+    std::mutex latestMutex_;
+    std::shared_ptr<ImageBuffer> latestFrame_;
+    QTimer *displayTimer_ = nullptr;
+    QTimer *reconnectTimer_ = nullptr;
 };

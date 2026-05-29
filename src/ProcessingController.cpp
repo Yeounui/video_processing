@@ -54,6 +54,11 @@ bool ProcessingController::isVideoSource() const
     return sourceType_ == SourceType::SOURCE_VIDEO_FILE;
 }
 
+bool ProcessingController::isStreamSource() const
+{
+    return sourceType_ == SourceType::SOURCE_REALTIME_STREAM;
+}
+
 bool ProcessingController::videoPlaying() const
 {
     return videoService_ && videoService_->isPlaying();
@@ -67,6 +72,15 @@ double ProcessingController::videoDuration() const
 double ProcessingController::videoPosition() const
 {
     return videoPosition_;
+}
+
+int ProcessingController::streamStatus() const
+{
+    if (!videoService_ || !videoService_->isStream()) {
+        return 0;
+    }
+
+    return static_cast<int>(videoService_->streamStatus());
 }
 
 int ProcessingController::effectStackSize() const
@@ -144,6 +158,11 @@ void ProcessingController::setOutImageDirect(std::shared_ptr<ImageBuffer> img)
 
 void ProcessingController::openImage(const QUrl &url)
 {
+    if (videoService_) {
+        videoService_->closeStream();
+        videoService_->close();
+    }
+
     QString path = url.toLocalFile();
     auto newBuf = ImageIoService::load(path);
 
@@ -192,7 +211,9 @@ void ProcessingController::openVideo(const QUrl &url)
         connect(videoService_, &VideoInputService::positionChanged, this, &ProcessingController::onVideoPosition);
         connect(videoService_, &VideoInputService::playbackFinished, this, &ProcessingController::onVideoPlaybackFinished);
         connect(videoService_, &VideoInputService::errorOccurred, this, &ProcessingController::errorOccurred);
+        connect(videoService_, &VideoInputService::streamStatusChanged, this, &ProcessingController::onStreamStatusChanged);
     } else {
+        videoService_->closeStream();
         videoService_->close();
     }
 
@@ -219,6 +240,61 @@ void ProcessingController::openVideo(const QUrl &url)
     videoService_->stepForward();
 }
 
+void ProcessingController::openStream(const QString &url)
+{
+    QString streamUrl = url.trimmed();
+    if (streamUrl.isEmpty()) {
+        emit errorOccurred(QStringLiteral("Cannot open stream: URL is empty"));
+        return;
+    }
+
+    if (!videoService_) {
+        videoService_ = new VideoInputService(this);
+        connect(videoService_, &VideoInputService::frameReady, this, &ProcessingController::onVideoFrame);
+        connect(videoService_, &VideoInputService::positionChanged, this, &ProcessingController::onVideoPosition);
+        connect(videoService_, &VideoInputService::playbackFinished, this, &ProcessingController::onVideoPlaybackFinished);
+        connect(videoService_, &VideoInputService::errorOccurred, this, &ProcessingController::errorOccurred);
+        connect(videoService_, &VideoInputService::streamStatusChanged, this, &ProcessingController::onStreamStatusChanged);
+    }
+
+    if (!videoService_->openStream(streamUrl)) {
+        emit streamStatusChanged();
+        return;
+    }
+
+    clearHistory();
+    effectStack_.clear();
+    inImage_.reset();
+    outImage_.reset();
+    ++inImageVersion_;
+    ++outImageVersion_;
+    sourceType_ = SourceType::SOURCE_REALTIME_STREAM;
+    sourceFileName_ = streamUrl;
+    videoPosition_ = 0.0;
+
+    emit sourceChanged();
+    emit hasImageChanged();
+    emit canSaveChanged();
+    emit streamStatusChanged();
+    emit effectStackChanged();
+}
+
+void ProcessingController::disconnectStream()
+{
+    if (sourceType_ == SourceType::SOURCE_REALTIME_STREAM && videoService_) {
+        videoService_->closeStream();
+        emit streamStatusChanged();
+    }
+}
+
+void ProcessingController::reconnectStream()
+{
+    if (videoService_) {
+        videoService_->reconnectStream();
+        emit streamStatusChanged();
+    }
+}
+
 void ProcessingController::reset()
 {
     clearHistory();
@@ -228,7 +304,8 @@ void ProcessingController::reset()
     }
 
     // Video mode: clear effect stack only
-    if (sourceType_ == SourceType::SOURCE_VIDEO_FILE) {
+    if (sourceType_ == SourceType::SOURCE_VIDEO_FILE
+        || sourceType_ == SourceType::SOURCE_REALTIME_STREAM) {
         clearEffectStack();
         return;
     }
@@ -254,7 +331,8 @@ void ProcessingController::applyAlgorithm(int algorithmId, const QVariantMap &pa
     QVariantMap mutableParams = params;
 
     // Video mode: append to effect stack instead of static apply
-    if (sourceType_ == SourceType::SOURCE_VIDEO_FILE) {
+    if (sourceType_ == SourceType::SOURCE_VIDEO_FILE
+        || sourceType_ == SourceType::SOURCE_REALTIME_STREAM) {
         if (!appendEffect(algorithmId, mutableParams)) {
             emit errorOccurred(QStringLiteral("Effect stack is full (max 3)"));
         }
@@ -466,6 +544,11 @@ void ProcessingController::onVideoPosition(double secs)
 void ProcessingController::onVideoPlaybackFinished()
 {
     emit videoPlayingChanged();
+}
+
+void ProcessingController::onStreamStatusChanged(VideoInputService::StreamStatus)
+{
+    emit streamStatusChanged();
 }
 
 void ProcessingController::playVideo()
