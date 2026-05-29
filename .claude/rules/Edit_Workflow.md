@@ -91,7 +91,7 @@ Use precise status terms:
 
 When status changes, ask `plan-coordinator` to update `plan/README.md`.
 Status text should make the next action visible.
-Do not describe unverified work as complete.
+Do not mark work as `verified` without a specific passing build, test, execution, or review result. Record the next action instead.
 
 ## Moving Or Deleting Files
 

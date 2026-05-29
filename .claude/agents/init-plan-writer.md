@@ -43,27 +43,11 @@ Expect the parent prompt to provide this structure:
 
 If the prompt does not provide enough information to write a requested section without interpretation, leave that section unchanged or report it as skipped.
 
-## Canonical Documents
+## Document Placement And Status Terms
 
-| Document | Content |
-|----------|---------|
-| `plan/OVERVIEW.md` | Project goal and scope |
-| `plan/PHASES.md` | Full workflow phases and procedures |
-| `plan/README.md` | Current status and document map |
-| `plan/USER.md` | User-run tasks and constraints |
-| `plan/DECISIONS.md` | Decision history and rationale |
-| `plan/ARCHITECTURE.md` | Code structure and architecture |
-| `plan/REVIEW.md` | Review, QA, validation, and fallback policy |
+See `.claude/rules/Edit_Workflow.md` for canonical document placement and status terms.
 
-## Status Terms
-
-Use status terms precisely:
-- `stub exists`: file exists but implementation is not real yet.
-- `draft written`: content or code exists but has not been reviewed or executed.
-- `generated`: a tool or model produced the artifact.
-- `verified`: build, test, execution, or review has confirmed it.
-
-For new planning documents, mark created documents as `generated` in `plan/README.md` unless the prompt provides reviewed or verified evidence. Do not mark anything as `verified` unless the prompt includes the specific passing check, review, or execution result.
+For new planning documents, mark created documents as `generated` in `plan/README.md` unless the prompt provides reviewed or verified evidence.
 
 ## Self-Audit
 

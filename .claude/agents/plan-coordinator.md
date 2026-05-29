@@ -49,29 +49,7 @@ One mode per call. Do not combine `retrieve` + `update` or `update` + `audit` in
 
 If the prompt lacks evidence needed for a requested update, report the missing evidence instead of guessing.
 
-## Canonical Documents
-
-| Document | Content |
-|----------|---------|
-| `plan/OVERVIEW.md` | Project goal and scope |
-| `plan/PHASES.md` | Full workflow phases and procedures |
-| `plan/README.md` | Current status and document map |
-| `plan/USER.md` | User-run tasks and constraints |
-| `plan/DECISIONS.md` | Decision history and rationale |
-| `plan/ARCHITECTURE.md` | Code structure and architecture |
-| `plan/REVIEW.md` | Review, QA, validation, and fallback policy |
-
-Do not duplicate long specs, tables, or architecture details across plan documents. Link to the canonical document instead.
-
-## Status Terms
-
-Use status terms precisely:
-- `stub exists`: file exists but implementation is not real yet.
-- `draft written`: content or code exists but has not been reviewed or executed.
-- `generated`: a tool or model produced the artifact.
-- `verified`: build, test, execution, or review has confirmed it.
-
-Do not mark anything as `verified` unless the prompt includes the specific passing check, review, or execution result. When verification failed or did not run, record the next action instead of implying completion.
+Canonical document placement and status terms: see `.claude/rules/Edit_Workflow.md`.
 
 ## Retrieval Mode
 
