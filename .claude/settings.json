@@ -1,14 +1,63 @@
 {
   "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "clear",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash",
+            "args": ["-c", ".claude/scripts/stop-llama.sh"],
+            "statusMessage": "llm: stopping..."
+          }
+        ]
+      },
+      {
+        "matcher": "startup",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash",
+            "args": ["-c", ".claude/scripts/session-init.sh"],
+            "statusMessage": "conda: activating..."
+          }
+        ]
+      }
+    ],
     "PreToolUse": [
+      {
+        "matcher": "mcp__llama__health_check",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash",
+            "args": ["-c", ".claude/scripts/start-llama.sh"],
+            "timeout": 90,
+            "statusMessage": "llm: starting..."
+          }
+        ]
+      },
       {
         "matcher": "Bash",
         "hooks": [
           {
             "type": "command",
             "if": "Bash(conda *)",
-            "command": "bash ${CLAUDE_PROJECT_DIR}/.claude/hooks/check_conda_activation.sh",
+            "command": "bash ${CLAUDE_PROJECT_DIR}/.claude/scripts/check_conda_activation.sh",
             "statusMessage": "Conda..."
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "matcher": "manual",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash",
+            "args": ["-c", ".claude/scripts/stop-llama.sh"],
+            "statusMessage": "llm: stopping..."
           }
         ]
       }
@@ -18,7 +67,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash -c 'source /home/seuoh/miniforge3/etc/profile.d/conda.sh && conda activate videoprocess && cmake --build /home/seuoh/workspace/qt_ui/build' 2>/dev/null || true",
+            "command": "bash",
+            "args": ["-c", "source \"$CONDA_SH\" && conda activate \"$CONDA_ENV\" && cmake --build \"$CLAUDE_PROJECT_DIR/build\" 2>/dev/null || true"],
             "statusMessage": "Building..."
           }
         ]

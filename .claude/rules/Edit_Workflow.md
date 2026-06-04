@@ -18,10 +18,10 @@ Before non-trivial work, gather context in this order:
 
 1. `CLAUDE.md`
 2. `plan/README.md`
-3. request task-relevant planning facts through `plan-coordinator`
+3. request task-relevant planning facts through `llama:plan`
 4. the files that will actually be changed
 
-Main Model may read `plan/README.md` directly as the status and document-map entry point. Access other `plan/*.md` files, `plan.md`, and `structure.md` through `plan-coordinator`; initial plan creation uses the `init-plan` skill.
+Main Model may read `plan/README.md` directly as the status and document-map entry point. Access other `plan/*.md` files, `plan.md`, and `structure.md` through `llama:plan`; initial plan creation uses the `init-plan` skill.
 
 While gathering context, surface conflicts, stale state, missing context, or unclear goals.
 Do not silently guess around inconsistencies.
@@ -89,7 +89,7 @@ Use precise status terms:
 - generated: a tool or model produced the artifact
 - verified: build, test, execution, or review has confirmed it
 
-When status changes, ask `plan-coordinator` to update `plan/README.md`.
+When status changes, use `llama:plan` to update `plan/README.md`.
 Status text should make the next action visible.
 Do not mark work as `verified` without a specific passing build, test, execution, or review result. Record the next action instead.
 
@@ -101,7 +101,7 @@ When moving or deleting files:
 2. Move or delete the file.
 3. Update reference paths.
 4. Run the relevant build, test, or document validation.
-5. If it is a decision, ask `plan-coordinator` to record the reason in `plan/DECISIONS.md`.
+5. If it is a decision, use `llama:plan` to record the reason in `plan/DECISIONS.md`.
 
 Do not leave deleted paths in `CLAUDE.md`, `README.md`, or `plan/`.
 If the deleted document has unique information, move that information to the canonical document first.
@@ -109,7 +109,7 @@ Do not move or delete files unrelated to the user's request.
 
 ## User Local Environment
 
-Use `plan-coordinator` to keep `plan/USER.md` as the canonical place for commands the user must run, personal paths, API keys, hardware constraints, and local operating notes.
+Use `llama:plan` to keep `plan/USER.md` as the canonical place for commands the user must run, personal paths, API keys, hardware constraints, and local operating notes.
 
 Minimize entries in `plan/USER.md`. Default to handling tasks autonomously.
 Only escalate to the user when Claude genuinely cannot proceed without human action:
@@ -127,13 +127,13 @@ Separate roles clearly:
 - Claude: input preparation, task splitting, result review, failure analysis
 - automation scripts: repeated execution, minimal validation, logs, backups
 
-Ask `plan-coordinator` to record concurrency, context size, timeout, GPU, or memory constraints in `plan/USER.md` or the relevant execution document.
+Use `llama:plan` to record concurrency, context size, timeout, GPU, or memory constraints in `plan/USER.md` or the relevant execution document.
 Use those constraints when sizing tasks.
 
 ## Context Management
 
 For non-trivial work, estimate scope and input/output size before starting.
-If the task is likely to exceed the available context, ask `plan-coordinator` to record the current state and next action in `plan/README.md`, then pause.
+If the task is likely to exceed the available context, use `llama:plan` to record the current state and next action in `plan/README.md`, then pause.
 
 Split long outputs by file or section.
 Do not modify many canonical documents in one pass unless the request requires it.
@@ -145,7 +145,7 @@ For non-trivial work, check at least:
 
 - old paths or file names with `rg`
 - Markdown links pointing at moved or deleted files
-- whether `plan-coordinator` needs to update `plan/README.md` status
-- whether `plan-coordinator` needs to add a `plan/DECISIONS.md` decision note
+- whether `llama:plan` needs to update `plan/README.md` status
+- whether `llama:plan` needs to add a `plan/DECISIONS.md` decision note
 
 If verification cannot run, say why and list the remaining check.
