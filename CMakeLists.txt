@@ -7,8 +7,18 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 find_package(Qt6 REQUIRED COMPONENTS Core Gui Qml Quick QuickControls2)
 
-# FFmpeg — conda videoprocess environment
-set(FFMPEG_PREFIX "/home/seuoh/miniforge3/envs/videoprocess")
+# FFmpeg prefix comes from the local shell environment. For this repo, source
+# .env before configuring or build from an activated Conda environment.
+if(DEFINED ENV{QT_UI_FFMPEG_PREFIX})
+    set(FFMPEG_PREFIX "$ENV{QT_UI_FFMPEG_PREFIX}")
+elseif(DEFINED ENV{FFMPEG_PREFIX})
+    set(FFMPEG_PREFIX "$ENV{FFMPEG_PREFIX}")
+elseif(DEFINED ENV{CONDA_PREFIX})
+    set(FFMPEG_PREFIX "$ENV{CONDA_PREFIX}")
+else()
+    message(FATAL_ERROR "Set QT_UI_FFMPEG_PREFIX, FFMPEG_PREFIX, or CONDA_PREFIX before configuring.")
+endif()
+file(TO_CMAKE_PATH "${FFMPEG_PREFIX}" FFMPEG_PREFIX)
 find_path(AVFORMAT_INCLUDE_DIR libavformat/avformat.h HINTS "${FFMPEG_PREFIX}/include" REQUIRED)
 # Use static libraries to avoid transitive dependency issues
 find_library(AVFORMAT_LIB avformat HINTS "${FFMPEG_PREFIX}/lib" REQUIRED)
@@ -76,7 +86,7 @@ set_target_properties(qt_ui PROPERTIES
 
 # ImageProcessorCore unit tests
 find_package(Qt6 OPTIONAL_COMPONENTS Test)
-if(Qt6Test_FOUND)
+if(Qt6Test_FOUND AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests")
     enable_testing()
     qt_add_executable(tst_ImageProcessorCore
         tests/tst_ImageProcessorCore.cpp
@@ -95,7 +105,6 @@ if(Qt6Test_FOUND)
         include/ImageBuffer.h
     )
     target_include_directories(tst_ImageIoService PRIVATE include)
-    target_compile_definitions(tst_ImageIoService PRIVATE TEST_IMAGE_PATH="${CMAKE_CURRENT_SOURCE_DIR}/ui_template/desktop.webp")
     target_link_libraries(tst_ImageIoService PRIVATE Qt6::Core Qt6::Gui Qt6::Test)
     add_test(NAME tst_ImageIoService COMMAND tst_ImageIoService)
     set_tests_properties(tst_ImageIoService PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
@@ -119,7 +128,6 @@ if(Qt6Test_FOUND)
     )
     target_include_directories(tst_ProcessingController PRIVATE include)
     target_include_directories(tst_ProcessingController PRIVATE "${FFMPEG_PREFIX}/include")
-    target_compile_definitions(tst_ProcessingController PRIVATE TEST_IMAGE_PATH="${CMAKE_CURRENT_SOURCE_DIR}/ui_template/desktop.webp")
     target_link_libraries(tst_ProcessingController PRIVATE Qt6::Core Qt6::Gui Qt6::Qml Qt6::OpenGL Qt6::Test ${AVFORMAT_LIB} ${AVCODEC_LIB} ${AVUTIL_LIB} ${SWSCALE_LIB} x264_compat)
     set_target_properties(tst_ProcessingController PROPERTIES
         BUILD_RPATH "${FFMPEG_PREFIX}/lib;${CMAKE_BINARY_DIR}"

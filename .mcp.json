@@ -1,9 +1,0 @@
-{
-  "mcpServers": {
-    "llama": {
-      "command": "python",
-      "args": [".llama/llama_server.py"],
-      "env": {}
-    }
-  }
-}

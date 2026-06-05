@@ -6,15 +6,23 @@
 class TestImageIoService : public QObject {
     Q_OBJECT
 private slots:
-    void testLoadWebp();
+    void testLoadRgbImage();
     void testLoadTransparentPngPreservesAlpha();
 };
 
-void TestImageIoService::testLoadWebp() {
-    auto img = ImageIoService::load(QStringLiteral(TEST_IMAGE_PATH));
+void TestImageIoService::testLoadRgbImage() {
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    const QString path = dir.filePath(QStringLiteral("rgb.png"));
+
+    QImage source(4, 2, QImage::Format_RGB888);
+    source.fill(QColor(10, 20, 30));
+    QVERIFY(source.save(path));
+
+    auto img = ImageIoService::load(path);
     QVERIFY(img != nullptr);
-    QCOMPARE(img->width, 1920);
-    QCOMPARE(img->height, 1199);
+    QCOMPARE(img->width, 4);
+    QCOMPARE(img->height, 2);
     QCOMPARE(img->channels, 3);
     QCOMPARE((int)img->data.size(), img->width * img->height * img->channels);
 }

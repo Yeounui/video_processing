@@ -1,4 +1,12 @@
 build/
+.*/
+.*
+!.gitignore
 .qmlls.ini
 .env
-.claude/settings.local.json
+__pycache__/
+*.py[cod]
+*.md
+!README.md
+plan/
+ui_template/

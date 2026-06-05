@@ -1,1 +1,0 @@
-- [Qt6 image processing plan bootstrap completed](init-plan-writer/bootstrap_completed.md) — initial plan documents created with 28 algorithms, 8 phases, 11 decisions
