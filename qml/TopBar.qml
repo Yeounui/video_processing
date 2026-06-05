@@ -1,34 +1,81 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
-import QtQuick.Dialogs
 import QtUi 1.0
 
 Rectangle {
+    id: root
     color: "#F8F8F5"
 
-    FileDialog {
-        id: openImageDialog
-        title: "Open Image"
-        nameFilters: ["Image files (*.png *.jpg *.jpeg *.bmp *.tiff *.gif *.webp)", "All files (*)"]
-        fileMode: FileDialog.OpenFile
-        onAccepted: ProcessingController.openImage(selectedFile)
+    property var activeFileDialog: null
+    property url lastSourceDialogFolder: ""
+    property url lastSaveDialogFolder: ""
+
+    function clearActiveFileDialog(dialog) {
+        if (activeFileDialog === dialog)
+            activeFileDialog = null
     }
 
-    FileDialog {
-        id: saveImageDialog
-        title: "Save Image"
-        nameFilters: ["PNG files (*.png)", "JPEG files (*.jpg *.jpeg)", "BMP files (*.bmp)", "All files (*)"]
-        fileMode: FileDialog.SaveFile
-        onAccepted: ProcessingController.saveImage(selectedFile)
+    function openFileDialog(component) {
+        if (activeFileDialog) {
+            const previousDialog = activeFileDialog
+            activeFileDialog = null
+            previousDialog.close()
+            previousDialog.destroy()
+        }
+
+        const dialogParent = root.Window.window ? root.Window.window.contentItem : root
+        const dialog = component.createObject(dialogParent)
+        if (!dialog)
+            return
+
+        activeFileDialog = dialog
+        dialog.open()
     }
 
-    FileDialog {
-        id: openVideoDialog
-        title: "Open Video"
-        nameFilters: ["Video files (*.mp4 *.avi *.mov *.mkv *.wmv *.flv *.webm *.m4v)", "All files (*)"]
-        fileMode: FileDialog.OpenFile
-        onAccepted: ProcessingController.openVideo(selectedFile)
+    Component {
+        id: openSourceDialogComponent
+
+        LocalFileDialog {
+            id: dialog
+            title: "Open Source"
+            nameFilters: [
+                "Media files (*.png *.jpg *.jpeg *.bmp *.tiff *.tif *.gif *.webp *.mp4 *.avi *.mov *.mkv *.wmv *.flv *.webm *.m4v)",
+                "Image files (*.png *.jpg *.jpeg *.bmp *.tiff *.tif *.gif *.webp)",
+                "Video files (*.mp4 *.avi *.mov *.mkv *.wmv *.flv *.webm *.m4v)",
+                "All files (*)"
+            ]
+            acceptLabel: "Open"
+            saveMode: false
+            initialFolder: root.lastSourceDialogFolder
+            onFinished: function(accepted, fileUrl, folder) {
+                root.lastSourceDialogFolder = folder
+                root.clearActiveFileDialog(dialog)
+                destroy()
+                if (accepted)
+                    ProcessingController.openSource(fileUrl)
+            }
+        }
+    }
+
+    Component {
+        id: saveImageDialogComponent
+
+        LocalFileDialog {
+            id: dialog
+            title: "Save Image"
+            nameFilters: ["PNG files (*.png)", "JPEG files (*.jpg *.jpeg)", "BMP files (*.bmp)", "All files (*)"]
+            acceptLabel: "Save"
+            saveMode: true
+            initialFolder: root.lastSaveDialogFolder
+            onFinished: function(accepted, fileUrl, folder) {
+                root.lastSaveDialogFolder = folder
+                root.clearActiveFileDialog(dialog)
+                destroy()
+                if (accepted)
+                    ProcessingController.saveImage(fileUrl)
+            }
+        }
     }
 
     Dialog {
@@ -71,26 +118,9 @@ Rectangle {
             spacing: 6
 
             Button {
-                text: "Open Image"
+                text: "Open Source"
                 implicitHeight: 34
-                onClicked: openImageDialog.open()
-                background: Rectangle {
-                    color: "#6F86AB"
-                    radius: 6
-                }
-                contentItem: Text {
-                    text: parent.text
-                    color: "#FFFFFF"
-                    font.pixelSize: 13
-                    horizontalAlignment: Text.AlignHCenter
-                    verticalAlignment: Text.AlignVCenter
-                }
-            }
-
-            Button {
-                text: "Open Video"
-                implicitHeight: 34
-                onClicked: openVideoDialog.open()
+                onClicked: openFileDialog(openSourceDialogComponent)
                 background: Rectangle {
                     color: "#6F86AB"
                     radius: 6
@@ -150,7 +180,7 @@ Rectangle {
                 text: "Save"
                 implicitHeight: 34
                 enabled: ProcessingController.canSave
-                onClicked: saveImageDialog.open()
+                onClicked: openFileDialog(saveImageDialogComponent)
                 background: Rectangle {
                     color: "transparent"
                     border.color: parent.enabled ? "#6F86AB" : "#E5E8EB"

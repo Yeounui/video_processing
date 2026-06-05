@@ -7,6 +7,7 @@
 #include <vector>
 #include <QObject>
 #include <QString>
+#include <QStringList>
 #include <QUrl>
 #include <QVariantMap>
 #include <QtQml/qqmlregistration.h>
@@ -22,6 +23,8 @@ class ProcessingController : public QObject {
     Q_PROPERTY(bool canSave READ canSave NOTIFY canSaveChanged)
     Q_PROPERTY(bool canUndo READ canUndo NOTIFY historyChanged)
     Q_PROPERTY(bool canRedo READ canRedo NOTIFY historyChanged)
+    Q_PROPERTY(QStringList historyLabels READ historyLabels NOTIFY historyChanged)
+    Q_PROPERTY(int historyIndex READ historyIndex NOTIFY historyChanged)
     Q_PROPERTY(AlgorithmModel* algorithmModel READ algorithmModel CONSTANT)
     Q_PROPERTY(QString sourceFileName READ sourceFileName NOTIFY sourceChanged)
     Q_PROPERTY(int imageWidth READ imageWidth NOTIFY sourceChanged)
@@ -44,6 +47,8 @@ public:
     bool canSave() const;
     bool canUndo() const;
     bool canRedo() const;
+    QStringList historyLabels() const;
+    int historyIndex() const;
     AlgorithmModel *algorithmModel() const;
     QString sourceFileName() const;
     int imageWidth() const;
@@ -70,6 +75,7 @@ public:
 
     // Public slots (Q_INVOKABLE)
     Q_INVOKABLE void openImage(const QUrl &url);
+    Q_INVOKABLE void openSource(const QUrl &url);
     Q_INVOKABLE void saveImage(const QUrl &url);
     Q_INVOKABLE void reset();
     Q_INVOKABLE void applyAlgorithm(int algorithmId, const QVariantMap &params);
@@ -116,7 +122,9 @@ private slots:
 
 private:
     void clearHistory();
-    void pushCommand(std::unique_ptr<EditCommand> command);
+    void pushCommand(std::unique_ptr<EditCommand> command, const QString &label);
+    QString algorithmLabel(int algorithmId) const;
+    QStringList visibleHistoryLabels() const;
     // Apply effectStack_ to src sequentially; returns result or src if stack is empty.
     std::shared_ptr<ImageBuffer> applyEffectStack(std::shared_ptr<ImageBuffer> src);
 
@@ -128,12 +136,14 @@ private:
     QString sourceFileName_;
     std::unique_ptr<AlgorithmModel> algorithmModel_;
     std::deque<std::unique_ptr<EditCommand>> history_;
+    QStringList historyLabels_;
     int historyIndex_ = -1;
     std::size_t historyBytes_ = 0;
 
     // GPU effect state
     bool gpuApplyPending_ = false;
     std::shared_ptr<ImageBuffer> gpuPrevOut_;
+    QString gpuPendingLabel_;
 
     // Video
     VideoInputService *videoService_ = nullptr;
@@ -143,4 +153,5 @@ private:
     struct EffectEntry { int algorithmId; QVariantMap params; };
     static constexpr int MaxEffectStack = 3;
     std::vector<EffectEntry> effectStack_;
+    QStringList effectStackLabels_;
 };

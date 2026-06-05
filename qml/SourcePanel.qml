@@ -75,6 +75,68 @@ Rectangle {
             }
         }
 
-        Item { Layout.fillHeight: true }
+        Rectangle {
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            color: "#F8F8F5"
+
+            ListView {
+                id: historyList
+                anchors.fill: parent
+                anchors.margins: 8
+                clip: true
+                model: ProcessingController.historyLabels
+                boundsBehavior: Flickable.StopAtBounds
+                spacing: 4
+
+                delegate: Rectangle {
+                    id: historyRow
+                    required property string modelData
+                    required property int index
+
+                    width: ListView.view.width
+                    height: 30
+                    radius: 5
+                    color: index === ProcessingController.historyIndex ? "#DDEEF4"
+                           : index < ProcessingController.historyIndex ? "#FFFFFF"
+                           : "#F1F2F3"
+                    border.color: index <= ProcessingController.historyIndex ? "#E5E8EB" : "#ECEFF2"
+                    border.width: 1
+
+                    RowLayout {
+                        anchors.fill: parent
+                        anchors.leftMargin: 8
+                        anchors.rightMargin: 8
+                        spacing: 6
+
+                        Text {
+                            text: String(historyRow.index + 1)
+                            font.pixelSize: 11
+                            color: historyRow.index <= ProcessingController.historyIndex ? "#6F86AB" : "#9AA1A8"
+                            horizontalAlignment: Text.AlignHCenter
+                            Layout.preferredWidth: 20
+                        }
+
+                        Text {
+                            text: historyRow.modelData
+                            font.pixelSize: 12
+                            color: historyRow.index <= ProcessingController.historyIndex ? "#2F3438" : "#9AA1A8"
+                            elide: Text.ElideRight
+                            Layout.fillWidth: true
+                        }
+                    }
+                }
+
+                ScrollBar.vertical: ScrollBar {}
+            }
+
+            Text {
+                anchors.centerIn: parent
+                visible: ProcessingController.historyLabels.length === 0
+                text: "No history"
+                font.pixelSize: 12
+                color: "#6E747A"
+            }
+        }
     }
 }

@@ -5,6 +5,7 @@
 #include "GpuEffectPipeline.h"
 #include "VideoInputService.h"
 #include <QFileInfo>
+#include <QStringList>
 #include <QUrl>
 #include <utility>
 
@@ -15,10 +16,12 @@ constexpr std::size_t MaxHistoryBytes = 512ULL * 1024ULL * 1024ULL;
 
 StaticApplyCommand::StaticApplyCommand(ProcessingController *ctrl,
                                        std::shared_ptr<ImageBuffer> prev,
-                                       std::shared_ptr<ImageBuffer> next)
+                                       std::shared_ptr<ImageBuffer> next,
+                                       QString label)
     : controller_(ctrl)
     , prev_(std::move(prev))
     , next_(std::move(next))
+    , label_(std::move(label))
 {
 }
 
@@ -39,6 +42,11 @@ std::size_t StaticApplyCommand::memoryBytes() const
     const std::size_t prevBytes = prev_ ? prev_->data.size() : 0;
     const std::size_t nextBytes = next_ ? next_->data.size() : 0;
     return prevBytes + nextBytes;
+}
+
+QString StaticApplyCommand::label() const
+{
+    return label_;
 }
 
 ProcessingController::ProcessingController(QObject *parent)
@@ -106,6 +114,21 @@ bool ProcessingController::canUndo() const
 bool ProcessingController::canRedo() const
 {
     return historyIndex_ < static_cast<int>(history_.size()) - 1;
+}
+
+QStringList ProcessingController::historyLabels() const
+{
+    return visibleHistoryLabels();
+}
+
+int ProcessingController::historyIndex() const
+{
+    if (sourceType_ == SourceType::SOURCE_VIDEO_FILE
+        || sourceType_ == SourceType::SOURCE_REALTIME_STREAM) {
+        return effectStackLabels_.isEmpty() ? -1 : static_cast<int>(effectStackLabels_.size()) - 1;
+    }
+
+    return historyIndex_;
 }
 
 AlgorithmModel *ProcessingController::algorithmModel() const
@@ -180,12 +203,43 @@ void ProcessingController::openImage(const QUrl &url)
     sourceType_ = SourceType::SOURCE_IMAGE;
     sourceFileName_ = QFileInfo(path).fileName();
     clearHistory();
+    effectStack_.clear();
+    effectStackLabels_.clear();
 
     // Emit all relevant signals
     emit sourceChanged();
     emit hasImageChanged();
     emit canSaveChanged();
+    emit effectStackChanged();
     emit imageChanged();
+}
+
+void ProcessingController::openSource(const QUrl &url)
+{
+    const QString path = url.toLocalFile();
+    const QString suffix = QFileInfo(path).suffix().toLower();
+    const QStringList imageExtensions = {
+        QStringLiteral("png"), QStringLiteral("jpg"), QStringLiteral("jpeg"),
+        QStringLiteral("bmp"), QStringLiteral("tiff"), QStringLiteral("tif"),
+        QStringLiteral("gif"), QStringLiteral("webp")
+    };
+    const QStringList videoExtensions = {
+        QStringLiteral("mp4"), QStringLiteral("avi"), QStringLiteral("mov"),
+        QStringLiteral("mkv"), QStringLiteral("wmv"), QStringLiteral("flv"),
+        QStringLiteral("webm"), QStringLiteral("m4v")
+    };
+
+    if (imageExtensions.contains(suffix)) {
+        openImage(url);
+        return;
+    }
+
+    if (videoExtensions.contains(suffix)) {
+        openVideo(url);
+        return;
+    }
+
+    emit errorOccurred(QStringLiteral("Unsupported source type: %1").arg(path));
 }
 
 void ProcessingController::saveImage(const QUrl &url)
@@ -223,6 +277,7 @@ void ProcessingController::openVideo(const QUrl &url)
 
     clearHistory();
     effectStack_.clear();
+    effectStackLabels_.clear();
     inImage_.reset();
     outImage_.reset();
     ++inImageVersion_;
@@ -235,6 +290,7 @@ void ProcessingController::openVideo(const QUrl &url)
     emit hasImageChanged();
     emit canSaveChanged();
     emit effectStackChanged();
+    emit historyChanged();
 
     // Deliver first frame
     videoService_->stepForward();
@@ -264,6 +320,7 @@ void ProcessingController::openStream(const QString &url)
 
     clearHistory();
     effectStack_.clear();
+    effectStackLabels_.clear();
     inImage_.reset();
     outImage_.reset();
     ++inImageVersion_;
@@ -277,6 +334,7 @@ void ProcessingController::openStream(const QString &url)
     emit canSaveChanged();
     emit streamStatusChanged();
     emit effectStackChanged();
+    emit historyChanged();
 }
 
 void ProcessingController::disconnectStream()
@@ -368,6 +426,7 @@ void ProcessingController::applyAlgorithm(int algorithmId, const QVariantMap &pa
     // Check if GPU path is available for this algorithm
     if (GpuEffectPipeline::supportsAlgorithm(algorithmId)) {
         gpuPrevOut_ = outImage_;
+        gpuPendingLabel_ = algorithmLabel(algorithmId);
         gpuApplyPending_ = true;
         emit pendingGpuApply(outImage_, algorithmId, mutableParams);
         return;  // async; commitGpuResult() will finish
@@ -381,7 +440,8 @@ void ProcessingController::applyAlgorithm(int algorithmId, const QVariantMap &pa
         return;
     }
 
-    pushCommand(std::make_unique<StaticApplyCommand>(this, prevOut, scratch));
+    const QString label = algorithmLabel(algorithmId);
+    pushCommand(std::make_unique<StaticApplyCommand>(this, prevOut, scratch, label), label);
     outImage_ = scratch;
     ++outImageVersion_;
     emit imageChanged();
@@ -412,37 +472,63 @@ void ProcessingController::redo()
 void ProcessingController::clearHistory()
 {
     history_.clear();
+    historyLabels_.clear();
     historyIndex_ = -1;
     historyBytes_ = 0;
     emit historyChanged();
 }
 
-void ProcessingController::pushCommand(std::unique_ptr<EditCommand> command)
+void ProcessingController::pushCommand(std::unique_ptr<EditCommand> command, const QString &label)
 {
     const std::size_t keepCount = static_cast<std::size_t>(historyIndex_ + 1);
     while (history_.size() > keepCount) {
         historyBytes_ -= history_.back()->memoryBytes();
         history_.pop_back();
+        historyLabels_.removeLast();
     }
 
     historyBytes_ += command->memoryBytes();
     history_.push_back(std::move(command));
+    historyLabels_.append(label);
     historyIndex_ = static_cast<int>(history_.size()) - 1;
 
     while (history_.size() > 1
            && (history_.size() > MaxHistoryCount || historyBytes_ > MaxHistoryBytes)) {
         historyBytes_ -= history_.front()->memoryBytes();
         history_.pop_front();
+        historyLabels_.removeFirst();
         --historyIndex_;
     }
+}
+
+QString ProcessingController::algorithmLabel(int algorithmId) const
+{
+    for (const auto &spec : ImageProcessorCore::specs()) {
+        if (spec.id == algorithmId)
+            return spec.name;
+    }
+
+    return QStringLiteral("Algorithm %1").arg(algorithmId);
+}
+
+QStringList ProcessingController::visibleHistoryLabels() const
+{
+    if (sourceType_ == SourceType::SOURCE_VIDEO_FILE
+        || sourceType_ == SourceType::SOURCE_REALTIME_STREAM) {
+        return effectStackLabels_;
+    }
+
+    return historyLabels_;
 }
 
 void ProcessingController::commitGpuResult(std::shared_ptr<ImageBuffer> result)
 {
     if (!gpuApplyPending_) return;
     gpuApplyPending_ = false;
-    pushCommand(std::make_unique<StaticApplyCommand>(this, gpuPrevOut_, result));
+    const QString label = gpuPendingLabel_.isEmpty() ? QStringLiteral("GPU effect") : gpuPendingLabel_;
+    pushCommand(std::make_unique<StaticApplyCommand>(this, gpuPrevOut_, result, label), label);
     gpuPrevOut_.reset();
+    gpuPendingLabel_.clear();
     outImage_ = result;
     ++outImageVersion_;
     emit imageChanged();
@@ -454,6 +540,7 @@ void ProcessingController::cancelGpuApply()
 {
     gpuApplyPending_ = false;
     gpuPrevOut_.reset();
+    gpuPendingLabel_.clear();
     emit errorOccurred(QStringLiteral("GPU effect failed; result unchanged"));
 }
 
@@ -464,7 +551,9 @@ bool ProcessingController::appendEffect(int algorithmId, const QVariantMap &para
     }
 
     effectStack_.push_back({algorithmId, params});
+    effectStackLabels_.append(algorithmLabel(algorithmId));
     emit effectStackChanged();
+    emit historyChanged();
 
     // Re-apply stack to current inImage_ so user sees result immediately
     if (inImage_) {
@@ -484,7 +573,9 @@ void ProcessingController::removeEffect(int index)
     }
 
     effectStack_.erase(effectStack_.begin() + index);
+    effectStackLabels_.removeAt(index);
     emit effectStackChanged();
+    emit historyChanged();
 
     if (inImage_) {
         outImage_ = applyEffectStack(inImage_);
@@ -500,7 +591,9 @@ void ProcessingController::clearEffectStack()
     }
 
     effectStack_.clear();
+    effectStackLabels_.clear();
     emit effectStackChanged();
+    emit historyChanged();
 
     if (inImage_) {
         outImage_ = std::make_shared<ImageBuffer>(*inImage_);
