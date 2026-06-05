@@ -3,6 +3,7 @@
 #include <QMetaObject>
 #include <QTimer>
 #include <algorithm>
+#include <cerrno>
 
 namespace {
 int interruptCallback(void *opaque)
@@ -15,7 +16,6 @@ int interruptCallback(void *opaque)
 VideoInputService::VideoInputService(QObject *parent)
     : QObject(parent)
 {
-    av_register_all();
     playTimer_ = new QTimer(this);
     connect(playTimer_, &QTimer::timeout, this, &VideoInputService::onTimerTick);
 
@@ -59,7 +59,7 @@ bool VideoInputService::open(const QString &path)
     // Find video stream
     videoStreamIdx_ = -1;
     for (unsigned int i = 0; i < fmtCtx_->nb_streams; ++i) {
-        if (fmtCtx_->streams[i]->codec->codec_type == AVMEDIA_TYPE_VIDEO) {
+        if (fmtCtx_->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_VIDEO) {
             videoStreamIdx_ = static_cast<int>(i);
             break;
         }
@@ -73,7 +73,8 @@ bool VideoInputService::open(const QString &path)
     }
 
     // Get codec
-    AVCodec *codec = avcodec_find_decoder(fmtCtx_->streams[videoStreamIdx_]->codec->codec_id);
+    AVCodecParameters *codecParams = fmtCtx_->streams[videoStreamIdx_]->codecpar;
+    const AVCodec *codec = avcodec_find_decoder(codecParams->codec_id);
     if (!codec) {
         avformat_close_input(&fmtCtx_);
         fmtCtx_ = nullptr;
@@ -90,13 +91,19 @@ bool VideoInputService::open(const QString &path)
         return false;
     }
 
-    avcodec_copy_context(codecCtx_, fmtCtx_->streams[videoStreamIdx_]->codec);
+    ret = avcodec_parameters_to_context(codecCtx_, codecParams);
+    if (ret < 0) {
+        avcodec_free_context(&codecCtx_);
+        avformat_close_input(&fmtCtx_);
+        fmtCtx_ = nullptr;
+        emit errorOccurred("Failed to copy codec parameters");
+        return false;
+    }
 
     // Open codec
     ret = avcodec_open2(codecCtx_, codec, nullptr);
     if (ret < 0) {
-        av_free(codecCtx_);
-        codecCtx_ = nullptr;
+        avcodec_free_context(&codecCtx_);
         avformat_close_input(&fmtCtx_);
         fmtCtx_ = nullptr;
         emit errorOccurred("Failed to open codec");
@@ -106,9 +113,7 @@ bool VideoInputService::open(const QString &path)
     // Allocate frame
     frame_ = av_frame_alloc();
     if (!frame_) {
-        avcodec_close(codecCtx_);
-        av_free(codecCtx_);
-        codecCtx_ = nullptr;
+        avcodec_free_context(&codecCtx_);
         avformat_close_input(&fmtCtx_);
         fmtCtx_ = nullptr;
         emit errorOccurred("Failed to allocate frame");
@@ -139,9 +144,7 @@ void VideoInputService::close()
     playTimer_->stop();
 
     if (codecCtx_) {
-        avcodec_close(codecCtx_);
-        av_free(codecCtx_);
-        codecCtx_ = nullptr;
+        avcodec_free_context(&codecCtx_);
     }
 
     if (fmtCtx_) {
@@ -210,7 +213,7 @@ bool VideoInputService::openStream(const QString &url)
 
     videoStreamIdx_ = -1;
     for (unsigned int i = 0; i < fmtCtx_->nb_streams; ++i) {
-        if (fmtCtx_->streams[i]->codec->codec_type == AVMEDIA_TYPE_VIDEO) {
+        if (fmtCtx_->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_VIDEO) {
             videoStreamIdx_ = static_cast<int>(i);
             break;
         }
@@ -224,7 +227,8 @@ bool VideoInputService::openStream(const QString &url)
         return false;
     }
 
-    AVCodec *codec = avcodec_find_decoder(fmtCtx_->streams[videoStreamIdx_]->codec->codec_id);
+    AVCodecParameters *codecParams = fmtCtx_->streams[videoStreamIdx_]->codecpar;
+    const AVCodec *codec = avcodec_find_decoder(codecParams->codec_id);
     if (!codec) {
         close();
         isStream_ = false;
@@ -242,7 +246,14 @@ bool VideoInputService::openStream(const QString &url)
         return false;
     }
 
-    avcodec_copy_context(codecCtx_, fmtCtx_->streams[videoStreamIdx_]->codec);
+    ret = avcodec_parameters_to_context(codecCtx_, codecParams);
+    if (ret < 0) {
+        close();
+        isStream_ = false;
+        setStreamStatus(StreamStatus::Disconnected);
+        emit errorOccurred("Failed to copy codec parameters");
+        return false;
+    }
 
     ret = avcodec_open2(codecCtx_, codec, nullptr);
     if (ret < 0) {
@@ -417,33 +428,50 @@ std::shared_ptr<ImageBuffer> VideoInputService::decodeNextFrame()
 {
     if (!isOpen()) return nullptr;
 
-    while (true) {
-        AVPacket pkt;
-        av_init_packet(&pkt);
-        pkt.data = nullptr;
-        pkt.size = 0;
+    AVPacket *pkt = av_packet_alloc();
+    if (!pkt) {
+        return nullptr;
+    }
 
-        int ret = av_read_frame(fmtCtx_, &pkt);
+    while (true) {
+        int ret = avcodec_receive_frame(codecCtx_, frame_);
+        if (ret == 0) {
+            auto buf = toImageBuffer(frame_);
+            av_packet_free(&pkt);
+            if (buf) {
+                return buf;
+            }
+            continue;
+        }
+        if (ret != AVERROR(EAGAIN) && ret != AVERROR_EOF) {
+            av_packet_free(&pkt);
+            return nullptr;
+        }
+
+        ret = av_read_frame(fmtCtx_, pkt);
         if (ret < 0) {
-            // EOF or error
+            avcodec_send_packet(codecCtx_, nullptr);
+            ret = avcodec_receive_frame(codecCtx_, frame_);
+            if (ret == 0) {
+                auto buf = toImageBuffer(frame_);
+                av_packet_free(&pkt);
+                return buf;
+            }
+            av_packet_free(&pkt);
             return nullptr;
         }
 
         // Skip packets from other streams
-        if (pkt.stream_index != videoStreamIdx_) {
-            av_free_packet(&pkt);
+        if (pkt->stream_index != videoStreamIdx_) {
+            av_packet_unref(pkt);
             continue;
         }
 
-        int gotFrame = 0;
-        avcodec_decode_video2(codecCtx_, frame_, &gotFrame, &pkt);
-        av_free_packet(&pkt);
-
-        if (gotFrame) {
-            auto buf = toImageBuffer(frame_);
-            if (buf) {
-                return buf;
-            }
+        ret = avcodec_send_packet(codecCtx_, pkt);
+        av_packet_unref(pkt);
+        if (ret < 0 && ret != AVERROR(EAGAIN)) {
+            av_packet_free(&pkt);
+            return nullptr;
         }
     }
 }
@@ -525,13 +553,28 @@ void VideoInputService::onTimerTick()
 
 void VideoInputService::runStreamProducer()
 {
-    while (!stopProducer_) {
-        AVPacket pkt;
-        av_init_packet(&pkt);
-        pkt.data = nullptr;
-        pkt.size = 0;
+    AVPacket *pkt = av_packet_alloc();
+    if (!pkt) {
+        QMetaObject::invokeMethod(this, &VideoInputService::onStreamDisconnected,
+                                  Qt::QueuedConnection);
+        return;
+    }
 
-        int ret = av_read_frame(fmtCtx_, &pkt);
+    while (!stopProducer_) {
+        int receiveRet = avcodec_receive_frame(codecCtx_, frame_);
+        if (receiveRet == 0) {
+            auto buf = toImageBuffer(frame_);
+            if (buf) {
+                std::lock_guard<std::mutex> lock(latestMutex_);
+                latestFrame_ = std::move(buf);
+            }
+            continue;
+        }
+        if (receiveRet != AVERROR(EAGAIN) && receiveRet != AVERROR_EOF) {
+            break;
+        }
+
+        int ret = av_read_frame(fmtCtx_, pkt);
         if (ret < 0) {
             if (!stopProducer_) {
                 QMetaObject::invokeMethod(this, &VideoInputService::onStreamDisconnected,
@@ -540,23 +583,19 @@ void VideoInputService::runStreamProducer()
             break;
         }
 
-        if (pkt.stream_index != videoStreamIdx_) {
-            av_free_packet(&pkt);
+        if (pkt->stream_index != videoStreamIdx_) {
+            av_packet_unref(pkt);
             continue;
         }
 
-        int gotFrame = 0;
-        avcodec_decode_video2(codecCtx_, frame_, &gotFrame, &pkt);
-        av_free_packet(&pkt);
-
-        if (gotFrame) {
-            auto buf = toImageBuffer(frame_);
-            if (buf) {
-                std::lock_guard<std::mutex> lock(latestMutex_);
-                latestFrame_ = std::move(buf);
-            }
+        ret = avcodec_send_packet(codecCtx_, pkt);
+        av_packet_unref(pkt);
+        if (ret < 0 && ret != AVERROR(EAGAIN)) {
+            break;
         }
     }
+
+    av_packet_free(&pkt);
 }
 
 void VideoInputService::onDisplayTick()

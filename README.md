@@ -1,8 +1,12 @@
 # Qt UI Video Processing
 
+[English README](assets/README.en.md)
+
 Qt 6 Quick/QML과 C++17로 작성한 이미지/비디오 처리 UI입니다.
 
 기존 `video_processing` 프로젝트의 28개 영상 처리 알고리즘을 데스크톱 UI에서 적용할 수 있도록 구성한 버전입니다. 정적 이미지, 영상 파일, RTSP/RTMP/HTTP 스트림 입력을 열 수 있고, 이미지 모드에서는 결과 저장과 undo/redo를 지원합니다.
+
+![Qt UI Video Processing preview](assets/screenshot.png)
 
 ## 주요 기능
 

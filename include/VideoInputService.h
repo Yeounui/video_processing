@@ -17,7 +17,7 @@ extern "C" {
 class QTimer;
 
 // Drives video file playback on the GUI thread via QTimer.
-// Uses the FFmpeg 2.x API (avcodec_decode_video2 + av_init_packet).
+// Uses the modern FFmpeg send/receive decode API.
 // Producer threads are NOT used for file sources (Phase 7 adds stream threading).
 class VideoInputService : public QObject {
     Q_OBJECT
@@ -74,7 +74,6 @@ private slots:
 
 private:
     // Decode one frame and return it, or nullptr on EOF/error.
-    // Uses avcodec_decode_video2 (FFmpeg 2.x API).
     std::shared_ptr<ImageBuffer> decodeNextFrame();
     std::shared_ptr<ImageBuffer> toImageBuffer(AVFrame *f);
 

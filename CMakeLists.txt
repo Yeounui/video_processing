@@ -40,6 +40,7 @@ qt_add_qml_module(qt_ui
     VERSION 1.0
     QML_FILES
         qml/App.qml
+        qml/LocalFileDialog.qml
         qml/TopBar.qml
         qml/SourcePanel.qml
         qml/ProcessingViewport.qml

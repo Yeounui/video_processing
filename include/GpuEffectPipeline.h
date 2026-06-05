@@ -36,7 +36,7 @@ private:
     GLuint getOrCompileProgram(int algorithmId);
     bool ensureTextures(int w, int h);
     void uploadSrc(const ImageBuffer &src);
-    std::shared_ptr<ImageBuffer> readback(int w, int h);
+    std::shared_ptr<ImageBuffer> readback(int w, int h, int channels);
     void setUniforms(GLuint prog, int algorithmId, const QVariantMap &params, int w, int h);
 
     static const char *fragmentSource(int algorithmId);
