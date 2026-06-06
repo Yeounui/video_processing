@@ -16,13 +16,13 @@ Rectangle {
 
         Rectangle {
             Layout.fillWidth: true
-            Layout.preferredHeight: categoryTabs.implicitHeight + 12
+            Layout.preferredHeight: categoryRows.implicitHeight + 12
             color: "#F8F8F5"
             border.color: "#E5E8EB"
             border.width: 1
 
-            Flow {
-                id: categoryTabs
+            Column {
+                id: categoryRows
                 anchors {
                     leftMargin: 8
                     rightMargin: 8
@@ -32,36 +32,52 @@ Rectangle {
                     right: parent.right
                     top: parent.top
                 }
-                spacing: 4
+                spacing: 3
 
-                Repeater {
-                    model: ["Point", "Geometry", "Filter", "Edge", "Morphology", "Grayscale"]
+                Component {
+                    id: categoryTabDelegate
 
-                    delegate: Rectangle {
-                        width: Math.max(44, tabLabel.implicitWidth + 10)
-                        height: 26
+                    Rectangle {
+                        width: Math.max(38, tabLabel.implicitWidth + 8)
+                        height: 24
                         radius: 4
                         color: ProcessingController.algorithmModel.category === modelData ? "#6F86AB" : "#FFFFFF"
                         border.color: ProcessingController.algorithmModel.category === modelData ? "transparent" : "#E5E8EB"
                         border.width: 1
 
-                        Text {
-                            id: tabLabel
-                            anchors.centerIn: parent
-                            text: modelData
-                            font.pixelSize: 11
-                            color: ProcessingController.algorithmModel.category === modelData ? "#FFFFFF" : "#2F3438"
-                        }
-
-                        MouseArea {
-                            anchors.fill: parent
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: {
-                                ProcessingController.algorithmModel.category = modelData
-                                root.selectedAlgorithmId = -1
-                                root.selectedParams = []
+                            Text {
+                                id: tabLabel
+                                anchors.centerIn: parent
+                                text: modelData
+                                font.pixelSize: 10
+                                color: ProcessingController.algorithmModel.category === modelData ? "#FFFFFF" : "#2F3438"
                             }
-                        }
+
+                            MouseArea {
+                                anchors.fill: parent
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: {
+                                    ProcessingController.algorithmModel.category = modelData
+                                    root.selectedAlgorithmId = -1
+                                    root.selectedParams = []
+                                }
+                            }
+                    }
+                }
+
+                Row {
+                    spacing: 4
+                    Repeater {
+                        model: ["Point", "Geometry", "Filter", "Edge"]
+                        delegate: categoryTabDelegate
+                    }
+                }
+
+                Row {
+                    spacing: 4
+                    Repeater {
+                        model: ["Morphology", "Grayscale"]
+                        delegate: categoryTabDelegate
                     }
                 }
             }
