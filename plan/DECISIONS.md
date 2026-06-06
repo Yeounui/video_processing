@@ -245,3 +245,37 @@ Consequence: direct FFmpeg remains a build/runtime dependency until stream
 timeout and reconnect parity are either implemented with OpenCV or accepted as a
 revised behavior. `VideoInputService` now has two acquisition paths but one
 public RGB/RGBA `ImageBuffer` boundary.
+
+## D-017: Centralize Acceleration Capability Planning
+
+Status: verified
+
+Decision: introduce `ProcessingBackend` as the capability and stack-planning
+boundary for acceleration.
+
+Reason: `GpuEffectPipeline` should own OpenGL execution details, not the
+generic decision of where a video effect stack splits between CPU prefix and
+accelerated suffix. The OpenCV migration needs the same planning contract to
+support CPU-only, OpenGL, UMat/OpenCL, CUDA, or future runtime-selected
+backends.
+
+Consequence: `ProcessingController` asks `ProcessingBackend` for video stack
+planning, `GpuEffectPipeline` delegates support reporting to that boundary, and
+future accelerated backends must report accelerated support, fused eligibility,
+and statistics requirements through the same architectural layer.
+
+## D-018: Compute Stack Statistics At The CPU Prefix Boundary
+
+Status: verified
+
+Decision: compute statistics-dependent algorithm parameters from the current
+CPU prefix image immediately before applying IDs `5`, `10`, and `23`.
+
+Reason: static-image and GPU paths use CPU-computed statistics. Video and
+stream stacks need the same rule per frame, especially when earlier CPU prefix
+effects change the image before a statistics-dependent effect runs.
+
+Consequence: hybrid stacks keep statistics on CPU even when a later suffix runs
+on an accelerated backend. If a future backend supports a statistics-dependent
+algorithm directly, the backend planner must still arrange CPU statistic
+computation before dispatch.

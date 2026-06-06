@@ -2,7 +2,7 @@
 #include "AlgorithmModel.h"
 #include "ImageProcessorCore.h"
 #include "ImageIoService.h"
-#include "GpuEffectPipeline.h"
+#include "ProcessingBackend.h"
 #include "VideoInputService.h"
 #include <QFileInfo>
 #include <QElapsedTimer>
@@ -14,6 +14,48 @@
 namespace {
 constexpr std::size_t MaxHistoryCount = 20;
 constexpr std::size_t MaxHistoryBytes = 512ULL * 1024ULL * 1024ULL;
+
+QVariantMap paramsWithCpuStatistics(const ImageBuffer &image, int algorithmId, QVariantMap params)
+{
+    if (algorithmId == 5) {
+        params.insert(QStringLiteral("stat_average"),
+                      ImageProcessorCore::computeAverageLuminance(image));
+    } else if (algorithmId == 10) {
+        auto [mn, mx] = ImageProcessorCore::computeMinMax(image);
+        params.insert(QStringLiteral("stat_min"), static_cast<int>(mn));
+        params.insert(QStringLiteral("stat_max"), static_cast<int>(mx));
+    } else if (algorithmId == 23) {
+        const auto hist = ImageProcessorCore::computeLuminanceHistogram(image);
+        int hmin = 0;
+        int hmax = 255;
+        for (int i = 0; i < static_cast<int>(hist.size()); ++i) {
+            if (hist[static_cast<std::size_t>(i)] != 0) {
+                hmin = i;
+                break;
+            }
+        }
+        for (int i = static_cast<int>(hist.size()) - 1; i >= 0; --i) {
+            if (hist[static_cast<std::size_t>(i)] != 0) {
+                hmax = i;
+                break;
+            }
+        }
+        params.insert(QStringLiteral("stat_hmin"), hmin);
+        params.insert(QStringLiteral("stat_hmax"), hmax);
+    }
+    return params;
+}
+
+std::vector<ProcessingBackend::Effect> toBackendEffects(
+    const std::vector<ProcessingController::EffectEntry> &effects)
+{
+    std::vector<ProcessingBackend::Effect> backendEffects;
+    backendEffects.reserve(effects.size());
+    for (const auto &effect : effects) {
+        backendEffects.push_back({effect.algorithmId, effect.params});
+    }
+    return backendEffects;
+}
 }
 
 StaticApplyCommand::StaticApplyCommand(ProcessingController *ctrl,
@@ -420,35 +462,10 @@ void ProcessingController::applyAlgorithm(int algorithmId, const QVariantMap &pa
         }
         return;
     }
-    if (algorithmId == 5) {
-        mutableParams.insert(QStringLiteral("stat_average"),
-                             ImageProcessorCore::computeAverageLuminance(*outImage_));
-    } else if (algorithmId == 10) {
-        auto [mn, mx] = ImageProcessorCore::computeMinMax(*outImage_);
-        mutableParams.insert(QStringLiteral("stat_min"), static_cast<int>(mn));
-        mutableParams.insert(QStringLiteral("stat_max"), static_cast<int>(mx));
-    } else if (algorithmId == 23) {
-        const auto hist = ImageProcessorCore::computeLuminanceHistogram(*outImage_);
-        int hmin = 0;
-        int hmax = 255;
-        for (int i = 0; i < static_cast<int>(hist.size()); ++i) {
-            if (hist[static_cast<std::size_t>(i)] != 0) {
-                hmin = i;
-                break;
-            }
-        }
-        for (int i = static_cast<int>(hist.size()) - 1; i >= 0; --i) {
-            if (hist[static_cast<std::size_t>(i)] != 0) {
-                hmax = i;
-                break;
-            }
-        }
-        mutableParams.insert(QStringLiteral("stat_hmin"), hmin);
-        mutableParams.insert(QStringLiteral("stat_hmax"), hmax);
-    }
+    mutableParams = paramsWithCpuStatistics(*outImage_, algorithmId, std::move(mutableParams));
 
     // Check if GPU path is available for this algorithm
-    if (GpuEffectPipeline::supportsAlgorithm(algorithmId)) {
+    if (ProcessingBackend::supportsAcceleratedAlgorithm(algorithmId)) {
         gpuPrevOut_ = outImage_;
         gpuPendingLabel_ = algorithmLabel(algorithmId);
         gpuApplyPending_ = true;
@@ -552,14 +569,7 @@ int ProcessingController::videoGpuSuffixStartIndex() const
         return static_cast<int>(effectStack_.size());
     }
 
-    int start = static_cast<int>(effectStack_.size());
-    for (int i = static_cast<int>(effectStack_.size()) - 1; i >= 0; --i) {
-        if (!GpuEffectPipeline::supportsAlgorithm(effectStack_[static_cast<std::size_t>(i)].algorithmId)) {
-            break;
-        }
-        start = i;
-    }
-    return start;
+    return ProcessingBackend::planVideoStack(toBackendEffects(effectStack_)).cpuPrefixCount;
 }
 
 void ProcessingController::commitGpuResult(std::shared_ptr<ImageBuffer> result)
@@ -665,7 +675,8 @@ std::shared_ptr<ImageBuffer> ProcessingController::applyEffectStackCpu(
         if (!out) {
             out = std::make_shared<ImageBuffer>();
         }
-        if (!ImageProcessorCore::apply(*cur, *out, e.algorithmId, e.params)) {
+        const QVariantMap effectParams = paramsWithCpuStatistics(*cur, e.algorithmId, e.params);
+        if (!ImageProcessorCore::apply(*cur, *out, e.algorithmId, effectParams)) {
             break;
         }
         cur = out;

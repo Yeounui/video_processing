@@ -81,6 +81,10 @@ Current automated coverage:
   metadata, BGR-to-RGB frame conversion, seek-to-start frame delivery, EOF
   stepping behavior, timer playback stop at loop-disabled EOF, loop-enabled
   restart, invalid playback-speed fallback, and missing-file error reporting.
+- `tst_ProcessingController` covers the backend suffix planner around rotate
+  and statistics-dependent CPU-only algorithms, the current fused GPU support
+  matrix, and CPU effect-stack statistics computed from the current source
+  image rather than the default statistic values.
 
 ## Video And Stream Acceptance
 
@@ -125,6 +129,8 @@ Acceleration review must cover:
 - Per-algorithm support reporting.
 - CPU fallback when an accelerated operation fails.
 - Hybrid CPU prefix plus accelerated suffix stacks.
+- Statistics-dependent CPU prefix effects compute `stat_*` from the current
+  prefix image before any accelerated suffix runs.
 - Fully accelerated display-time stacks with no unnecessary readback when the
   architecture supports it.
 - Stale result rejection when source image/version changes mid-flight.

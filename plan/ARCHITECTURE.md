@@ -17,6 +17,9 @@ ImageProcessorCore
 GpuEffectPipeline
     applies selected algorithms through OpenGL 3.3 GLSL shaders
 
+ProcessingBackend
+    reports backend capabilities and plans CPU prefix plus accelerated suffix
+
 ImageIoService
     loads and saves still images through QImage
 
@@ -156,16 +159,27 @@ generically enough to cover CPU, OpenCL/UMat, CUDA, and any future backend.
 For video and stream sources:
 
 - Find the longest accelerated-supported suffix from the end of the effect
-  stack.
+  stack with `ProcessingBackend::planVideoStack()`.
 - Apply effects before that suffix on CPU.
 - Expose the CPU prefix result as `outImage`.
 - Apply the accelerated suffix during display or backend execution.
 - If the suffix starts at index 0, skip CPU processing for that frame.
 - If no suffix exists, apply the whole stack on CPU.
+- For CPU-applied prefix entries that require statistics (`5`, `10`, `23`),
+  compute the required `stat_*` values from the current prefix image before
+  applying the algorithm. This keeps GPU/static-image semantics aligned: GPU
+  or hybrid paths consume CPU-computed statistics rather than recomputing them
+  inside an accelerated shader.
 
 This matters for stacks such as `Rotate -> Sharpen -> Median`: rotate must run
 as the CPU prefix because it changes dimensions and alpha bounds, while
 sharpen/median may remain an accelerated suffix if supported.
+
+It also matters for stacks such as `Brightness -> Average Threshold -> Flip`:
+brightness changes the image that average threshold must measure, average
+threshold runs in the CPU prefix because it requires CPU statistics, and flip
+may remain in the accelerated suffix if it is still part of the longest
+supported suffix.
 
 ## Current GPU Support Baseline
 
@@ -187,6 +201,14 @@ Current tests assert:
 The OpenCV migration does not have to preserve this exact support matrix, but it
 must preserve the architectural separation between CPU reference behavior,
 accelerated eligibility, fused eligibility, and fallback.
+
+Current implementation note:
+
+- `ProcessingBackend` owns the support matrix and stack planner.
+- `GpuEffectPipeline` owns OpenGL execution and delegates support reporting to
+  `ProcessingBackend`.
+- `ProcessingController` depends on backend planning for video suffix splitting
+  and no longer queries the OpenGL pipeline directly for stack boundaries.
 
 ## Video Source Spec
 

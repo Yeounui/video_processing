@@ -1,4 +1,5 @@
 #include "GpuEffectPipeline.h"
+#include "ProcessingBackend.h"
 #include <QDebug>
 #include <cmath>
 
@@ -486,32 +487,20 @@ void main() {
 // ============================================================================
 
 bool GpuEffectPipeline::supportsAlgorithm(int algorithmId) {
-    static const int supported[] = {1, 2, 3, 4, 6, 7, 9, 11, 12, 14, 19, 20, 21, 25, 26, 27, 28};
-    for (int s : supported) {
-        if (s == algorithmId) return true;
-    }
-    return false;
+    return ProcessingBackend::supportsAcceleratedAlgorithm(algorithmId);
 }
 
 bool GpuEffectPipeline::supportsFusedAlgorithm(int algorithmId) {
-    static const int supported[] = {1, 2, 3, 4, 7, 26, 27, 28};
-    for (int s : supported) {
-        if (s == algorithmId) return true;
-    }
-    return false;
+    return ProcessingBackend::supportsFusedAlgorithm(algorithmId);
 }
 
 bool GpuEffectPipeline::supportsFusedStack(const std::vector<GpuEffectCommand> &effects) {
-    if (effects.empty() || effects.size() > 3) {
-        return false;
-    }
-
+    std::vector<ProcessingBackend::Effect> backendEffects;
+    backendEffects.reserve(effects.size());
     for (const auto &effect : effects) {
-        if (!supportsFusedAlgorithm(effect.algorithmId)) {
-            return false;
-        }
+        backendEffects.push_back({effect.algorithmId, effect.params});
     }
-    return true;
+    return ProcessingBackend::supportsFusedStack(backendEffects);
 }
 
 bool GpuEffectPipeline::initialize() {

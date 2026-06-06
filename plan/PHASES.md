@@ -179,6 +179,26 @@ Exit criteria:
 - Display-only video suffixes avoid unnecessary CPU readback where the backend
   and viewport boundary support it.
 
+Implementation note:
+
+- `ProcessingBackend` now centralizes the current OpenGL accelerated support
+  matrix, fused-stack eligibility, statistics-dependency reporting, and
+  CPU-prefix/accelerated-suffix planning for video stacks.
+- `GpuEffectPipeline` keeps the OpenGL execution implementation but delegates
+  public support checks to `ProcessingBackend`, so future OpenCV UMat/CUDA
+  backends can replace or extend capability planning without exposing OpenCV
+  types to QML.
+- `ProcessingController` uses `ProcessingBackend::planVideoStack()` to decide
+  the CPU prefix boundary instead of querying `GpuEffectPipeline` directly.
+- Statistics-dependent algorithms still compute statistics on CPU. For
+  effect-stack CPU prefixes, the statistics are computed from the current
+  prefix image immediately before `ImageProcessorCore::apply()`, so stacks such
+  as `Brightness -> Average Threshold -> accelerated suffix` use frame-local
+  statistics before handing the remaining suffix to the accelerated path.
+- Phase 5 is not fully verified yet because runtime backend selection,
+  accelerated-failure fallback, and CPU-only startup coverage still need
+  explicit acceptance tests.
+
 ## Phase 6: Remove Replaced Dependencies
 
 Status: generated

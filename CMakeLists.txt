@@ -63,6 +63,8 @@ qt_add_qml_module(qt_ui
         src/ProcessingViewportItem.cpp
         include/ImageProcessorCore.h
         src/ImageProcessorCore.cpp
+        include/ProcessingBackend.h
+        src/ProcessingBackend.cpp
         include/OpenCvImageBridge.h
         src/OpenCvImageBridge.cpp
         include/GpuEffectPipeline.h
@@ -164,6 +166,8 @@ if(Qt6Test_FOUND AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests")
         src/ProcessingController.cpp
         include/ImageProcessorCore.h
         src/ImageProcessorCore.cpp
+        include/ProcessingBackend.h
+        src/ProcessingBackend.cpp
         include/OpenCvImageBridge.h
         src/OpenCvImageBridge.cpp
         include/GpuEffectPipeline.h

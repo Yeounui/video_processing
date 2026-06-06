@@ -57,6 +57,11 @@ requirements.
   `imgproc`, `imgcodecs`, and `videoio`.
 - Current GPU processing uses `GpuEffectPipeline` for a subset of algorithms.
 - Current video stack optimization uses a CPU prefix plus GPU suffix model.
+- `ProcessingBackend` now owns accelerated support reporting, fused-stack
+  eligibility, and CPU-prefix/accelerated-suffix planning for video stacks.
+- CPU-applied effect-stack entries compute `stat_*` parameters from the current
+  prefix image before applying statistics-dependent algorithms, preserving the
+  CPU-statistics contract for hybrid CPU/GPU stacks.
 - Plan documents are intended to be tracked through the `.gitignore`
   exception for `plan/*.md`.
 
@@ -94,6 +99,12 @@ requirements.
   loop-enabled restart, and invalid speed fallback. `cmake --build build` and
   `ctest --test-dir build --output-on-failure` passed after the coverage
   update.
+- 2026-06-06: Phase 5 backend planning started with `ProcessingBackend`,
+  centralizing the current OpenGL support matrix, fused-stack eligibility, and
+  CPU-prefix/accelerated-suffix splitting. CPU prefix application now computes
+  per-frame `stat_*` parameters for statistics-dependent effects before
+  dispatching OpenCV CPU algorithms. `cmake --build build` and
+  `ctest --test-dir build --output-on-failure` passed after the change.
 
 ## Source Evidence
 
@@ -102,6 +113,8 @@ requirements.
 - Current CPU algorithm behavior: `src/ImageProcessorCore.cpp`
 - Current OpenCV bridge behavior: `src/OpenCvImageBridge.cpp`
 - Current GPU algorithm behavior: `src/GpuEffectPipeline.cpp`
+- Current backend capability and stack planning behavior:
+  `src/ProcessingBackend.cpp`
 - Current viewport GPU suffix handoff: `src/ProcessingViewportItem.cpp`
 - Stack support tests: `tests/tst_ProcessingController.cpp`
 - Bridge tests: `tests/tst_OpenCvImageBridge.cpp`
