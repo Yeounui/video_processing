@@ -11,6 +11,7 @@ private slots:
     void testOpenSourceRoutesImageByExtension();
     void testHistoryLabelsTrackApplyUndoRedoReset();
     void testGpuFusedStackSupport();
+    void testMedianGpuAndHybridSuffixSupport();
 };
 
 void TestProcessingController::testOpenImageFromFileUrl() {
@@ -110,6 +111,13 @@ void TestProcessingController::testGpuFusedStackSupport() {
     };
     QVERIFY(!GpuEffectPipeline::supportsAlgorithm(8));
     QVERIFY(!GpuEffectPipeline::supportsFusedStack(cpuOnly));
+}
+
+void TestProcessingController::testMedianGpuAndHybridSuffixSupport() {
+    QVERIFY(GpuEffectPipeline::supportsAlgorithm(25));
+    std::vector<GpuEffectCommand> medianStack = {{25, QVariantMap{}}};
+    QVERIFY(GpuEffectPipeline::supportsAlgorithm(medianStack[0].algorithmId));
+    QVERIFY(!GpuEffectPipeline::supportsFusedStack(medianStack));
 }
 
 QTEST_MAIN(TestProcessingController)

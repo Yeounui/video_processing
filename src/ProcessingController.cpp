@@ -105,13 +105,19 @@ bool ProcessingController::videoEffectStackUsesGpu() const
         return false;
     }
 
-    if (effectStack_.empty()) {
-        return false;
+    return videoGpuSuffixStartIndex() < static_cast<int>(effectStack_.size());
+}
+
+std::vector<ProcessingController::EffectEntry> ProcessingController::videoGpuEffectSuffix() const
+{
+    const int start = videoGpuSuffixStartIndex();
+    if (start >= static_cast<int>(effectStack_.size())) {
+        return {};
     }
 
-    return std::all_of(effectStack_.begin(), effectStack_.end(), [](const EffectEntry &effect) {
-        return GpuEffectPipeline::supportsAlgorithm(effect.algorithmId);
-    });
+    return std::vector<EffectEntry>(
+        effectStack_.begin() + start,
+        effectStack_.end());
 }
 
 bool ProcessingController::hasImage() const
@@ -539,6 +545,23 @@ QStringList ProcessingController::visibleHistoryLabels() const
     return historyLabels_;
 }
 
+int ProcessingController::videoGpuSuffixStartIndex() const
+{
+    if (sourceType_ != SourceType::SOURCE_VIDEO_FILE
+        && sourceType_ != SourceType::SOURCE_REALTIME_STREAM) {
+        return static_cast<int>(effectStack_.size());
+    }
+
+    int start = static_cast<int>(effectStack_.size());
+    for (int i = static_cast<int>(effectStack_.size()) - 1; i >= 0; --i) {
+        if (!GpuEffectPipeline::supportsAlgorithm(effectStack_[static_cast<std::size_t>(i)].algorithmId)) {
+            break;
+        }
+        start = i;
+    }
+    return start;
+}
+
 void ProcessingController::commitGpuResult(std::shared_ptr<ImageBuffer> result)
 {
     if (!gpuApplyPending_) return;
@@ -622,18 +645,22 @@ void ProcessingController::clearEffectStack()
 
 std::shared_ptr<ImageBuffer> ProcessingController::applyEffectStack(std::shared_ptr<ImageBuffer> src)
 {
-    if (videoEffectStackUsesGpu()) {
+    const int cpuEnd = videoGpuSuffixStartIndex();
+    if (cpuEnd == 0) {
         return src;
     }
 
-    return applyEffectStackCpu(std::move(src));
+    return applyEffectStackCpu(std::move(src), cpuEnd);
 }
 
-std::shared_ptr<ImageBuffer> ProcessingController::applyEffectStackCpu(std::shared_ptr<ImageBuffer> src)
+std::shared_ptr<ImageBuffer> ProcessingController::applyEffectStackCpu(
+    std::shared_ptr<ImageBuffer> src, int effectCount)
 {
     auto cur = src;
     bool useA = nextCpuScratchA_;
-    for (const auto &e : effectStack_) {
+    const int clampedCount = std::clamp(effectCount, 0, static_cast<int>(effectStack_.size()));
+    for (int i = 0; i < clampedCount; ++i) {
+        const auto &e = effectStack_[static_cast<std::size_t>(i)];
         auto &out = useA ? cpuScratchA_ : cpuScratchB_;
         if (!out) {
             out = std::make_shared<ImageBuffer>();
@@ -653,8 +680,9 @@ void ProcessingController::onVideoFrame(std::shared_ptr<ImageBuffer> frame)
     bool wasEmpty = !inImage_;
     inImage_ = frame;
     ++inImageVersion_;
+    const bool hasCpuVideoEffects = !effectStack_.empty() && videoGpuSuffixStartIndex() > 0;
 
-    if (!videoEffectStackUsesGpu() && !effectStack_.empty()
+    if (hasCpuVideoEffects
         && (sourceType_ == SourceType::SOURCE_VIDEO_FILE
             || sourceType_ == SourceType::SOURCE_REALTIME_STREAM)
         && dropNextCpuFrame_) {
@@ -670,7 +698,7 @@ void ProcessingController::onVideoFrame(std::shared_ptr<ImageBuffer> frame)
     timer.start();
     outImage_ = applyEffectStack(frame);
     lastFrameProcessMs_ = timer.elapsed();
-    if (!videoEffectStackUsesGpu() && !effectStack_.empty()) {
+    if (hasCpuVideoEffects) {
         const double fps = videoService_ ? videoService_->fps() : 30.0;
         const qint64 budgetMs = std::max<qint64>(1, static_cast<qint64>(1000.0 / std::max(1.0, fps)));
         dropNextCpuFrame_ = lastFrameProcessMs_ > budgetMs;

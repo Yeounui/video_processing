@@ -320,6 +320,54 @@ void main() {
 )glsl";
         return src;
     }
+    case 25: {  // Median Smoothing
+        static const char *src = R"glsl(
+#version 330 core
+uniform sampler2D u_tex;
+uniform vec2 u_invSize;
+in vec2 v_uv;
+out vec4 fragColor;
+
+float median9(float v[9]) {
+    for (int i = 1; i < 9; ++i) {
+        float key = v[i];
+        int j = i - 1;
+        while (j >= 0 && v[j] > key) {
+            v[j + 1] = v[j];
+            --j;
+        }
+        v[j + 1] = key;
+    }
+    return v[4];
+}
+
+void main() {
+    vec4 center = texture(u_tex, v_uv);
+    if (center.a <= 0.0) {
+        fragColor = vec4(0.0);
+        return;
+    }
+
+    float r[9];
+    float g[9];
+    float b[9];
+    int k = 0;
+    for (int dy = -1; dy <= 1; ++dy) {
+        for (int dx = -1; dx <= 1; ++dx) {
+            vec4 sample = texture(u_tex, clamp(v_uv + vec2(float(dx), float(dy)) * u_invSize,
+                                               0.5 * u_invSize, 1.0 - 0.5 * u_invSize));
+            r[k] = sample.r;
+            g[k] = sample.g;
+            b[k] = sample.b;
+            ++k;
+        }
+    }
+
+    fragColor = vec4(median9(r), median9(g), median9(b), center.a);
+}
+)glsl";
+        return src;
+    }
     case 26: {  // Grayscale Average
         static const char *src = R"glsl(
 #version 330 core
@@ -438,7 +486,7 @@ void main() {
 // ============================================================================
 
 bool GpuEffectPipeline::supportsAlgorithm(int algorithmId) {
-    static const int supported[] = {1, 2, 3, 4, 6, 7, 9, 11, 12, 14, 19, 20, 21, 26, 27, 28};
+    static const int supported[] = {1, 2, 3, 4, 6, 7, 9, 11, 12, 14, 19, 20, 21, 25, 26, 27, 28};
     for (int s : supported) {
         if (s == algorithmId) return true;
     }

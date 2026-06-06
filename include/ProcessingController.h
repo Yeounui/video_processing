@@ -71,6 +71,7 @@ public:
     void setOutImageDirect(std::shared_ptr<ImageBuffer> img);
     const std::vector<EffectEntry> &effectStack() const { return effectStack_; }
     bool videoEffectStackUsesGpu() const;
+    std::vector<EffectEntry> videoGpuEffectSuffix() const;
 
     // GPU state accessors
     bool gpuApplyPending() const { return gpuApplyPending_; }
@@ -129,9 +130,10 @@ private:
     void pushCommand(std::unique_ptr<EditCommand> command, const QString &label);
     QString algorithmLabel(int algorithmId) const;
     QStringList visibleHistoryLabels() const;
+    int videoGpuSuffixStartIndex() const;
     // Apply effectStack_ to src sequentially; returns result or src if stack is empty.
     std::shared_ptr<ImageBuffer> applyEffectStack(std::shared_ptr<ImageBuffer> src);
-    std::shared_ptr<ImageBuffer> applyEffectStackCpu(std::shared_ptr<ImageBuffer> src);
+    std::shared_ptr<ImageBuffer> applyEffectStackCpu(std::shared_ptr<ImageBuffer> src, int effectCount);
 
     std::shared_ptr<ImageBuffer> inImage_;
     std::shared_ptr<ImageBuffer> outImage_;

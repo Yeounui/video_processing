@@ -55,7 +55,20 @@ inline void clearTransparentRgb(ImageBuffer& img) {
                 setPx(img, x, y, 0, 0);
                 setPx(img, x, y, 1, 0);
                 setPx(img, x, y, 2, 0);
-            }
+    }
+}
+
+inline uint8_t median9(uint8_t vals[9]) {
+    for (int i = 1; i < 9; ++i) {
+        uint8_t key = vals[i];
+        int j = i - 1;
+        while (j >= 0 && vals[j] > key) {
+            vals[j + 1] = vals[j];
+            --j;
+        }
+        vals[j + 1] = key;
+    }
+    return vals[4];
 }
 
 // 1D Gaussian kernel (normalized), size must be odd
@@ -637,12 +650,12 @@ bool ImageProcessorCore::apply(const ImageBuffer& src, ImageBuffer& dst,
         for (int y = 0; y < H; ++y)
             for (int x = 0; x < W; ++x)
                 for (int c = 0; c < 3; ++c) {
-                    std::vector<uint8_t> vals;
+                    uint8_t vals[9];
+                    int i = 0;
                     for (int dy = -1; dy <= 1; ++dy)
                         for (int dx = -1; dx <= 1; ++dx)
-                            vals.push_back(px(src, x + dx, y + dy, c));
-                    std::sort(vals.begin(), vals.end());
-                    setPx(dst, x, y, c, vals[4]);
+                            vals[i++] = px(src, x + dx, y + dy, c);
+                    setPx(dst, x, y, c, median9(vals));
                 }
         break;
     }

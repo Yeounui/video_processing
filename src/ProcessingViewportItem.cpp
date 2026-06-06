@@ -644,7 +644,7 @@ QSGNode *ProcessingViewportItem::updatePaintNode(QSGNode *old, UpdatePaintNodeDa
     snap.window        = window();
     snap.videoGpuEffectsEnabled = controller_->videoEffectStackUsesGpu();
     if (snap.videoGpuEffectsEnabled) {
-        const auto &effects = controller_->effectStack();
+        const auto effects = controller_->videoGpuEffectSuffix();
         snap.videoGpuEffects.reserve(effects.size());
         for (const auto &effect : effects) {
             snap.videoGpuEffects.push_back({effect.algorithmId, effect.params});
