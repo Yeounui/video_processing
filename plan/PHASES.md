@@ -151,6 +151,8 @@ Implementation note:
   `0.0`.
 - File seek uses OpenCV position properties and preserves the existing
   `seekToSecs()` behavior of immediately delivering the next frame.
+- File timer playback behavior is covered for play/pause state, loop-disabled
+  EOF finish, loop-enabled restart, and invalid playback-speed fallback.
 - Real-time streams still use the existing FFmpeg producer, interrupt callback,
   latest-frame handoff, reconnect timer, and status signals. Direct FFmpeg
   removal remains blocked until stream timeout/reconnect parity is accepted.

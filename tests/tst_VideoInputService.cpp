@@ -16,6 +16,10 @@ class TestVideoInputService : public QObject {
 
 private slots:
     void testOpenCvFilePlaybackProducesRgbFrames();
+    void testSeekToStartDeliversFirstFrame();
+    void testTimerPlaybackStopsAtEofWhenLoopDisabled();
+    void testTimerPlaybackLoopsWhenEnabled();
+    void testInvalidSpeedFallsBackToNormalRate();
     void testMissingFileReportsError();
 };
 
@@ -46,9 +50,23 @@ bool writeTestVideo(const QString &path)
     return verifier.isOpened();
 }
 
+QString makeTestVideoOrEmpty(QTemporaryDir &dir)
+{
+    const QString path = dir.filePath(QStringLiteral("source.avi"));
+    return writeTestVideo(path) ? path : QString();
+}
+
 bool channelNear(int actual, int expected)
 {
     return std::abs(actual - expected) <= 30;
+}
+
+bool frameMatchesRgb(const std::shared_ptr<ImageBuffer> &frame, int r, int g, int b)
+{
+    return frame && frame->channels == 3 && frame->data.size() >= 3
+        && channelNear(frame->data[0], r)
+        && channelNear(frame->data[1], g)
+        && channelNear(frame->data[2], b);
 }
 }
 
@@ -56,8 +74,8 @@ void TestVideoInputService::testOpenCvFilePlaybackProducesRgbFrames()
 {
     QTemporaryDir dir;
     QVERIFY(dir.isValid());
-    const QString path = dir.filePath(QStringLiteral("source.avi"));
-    if (!writeTestVideo(path)) {
+    const QString path = makeTestVideoOrEmpty(dir);
+    if (path.isEmpty()) {
         QSKIP("OpenCV VideoWriter could not create the test AVI in this environment.");
     }
 
@@ -86,12 +104,111 @@ void TestVideoInputService::testOpenCvFilePlaybackProducesRgbFrames()
     QCOMPARE(first->height, 2);
     QCOMPARE(first->channels, 3);
     QCOMPARE(first->data.size(), std::size_t{24});
-    QVERIFY(channelNear(first->data[0], 30));
-    QVERIFY(channelNear(first->data[1], 20));
-    QVERIFY(channelNear(first->data[2], 10));
+    QVERIFY(frameMatchesRgb(first, 30, 20, 10));
 
     service.stepForward();
     QCOMPARE(frames.size(), std::size_t{3});
+}
+
+void TestVideoInputService::testSeekToStartDeliversFirstFrame()
+{
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    const QString path = makeTestVideoOrEmpty(dir);
+    if (path.isEmpty()) {
+        QSKIP("OpenCV VideoWriter could not create the test AVI in this environment.");
+    }
+
+    VideoInputService service;
+    std::vector<std::shared_ptr<ImageBuffer>> frames;
+    connect(&service, &VideoInputService::frameReady, this,
+            [&frames](std::shared_ptr<ImageBuffer> frame) {
+                frames.push_back(std::move(frame));
+            });
+
+    QVERIFY(service.open(path));
+    service.stepForward();
+    service.stepForward();
+    QCOMPARE(frames.size(), std::size_t{2});
+    QVERIFY(frameMatchesRgb(frames[0], 30, 20, 10));
+    QVERIFY(frameMatchesRgb(frames[1], 60, 50, 40));
+
+    service.seekToSecs(0.0);
+    QCOMPARE(frames.size(), std::size_t{3});
+    QVERIFY(frameMatchesRgb(frames.back(), 30, 20, 10));
+    QVERIFY(service.currentTimeSecs() >= 0.0);
+}
+
+void TestVideoInputService::testTimerPlaybackStopsAtEofWhenLoopDisabled()
+{
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    const QString path = makeTestVideoOrEmpty(dir);
+    if (path.isEmpty()) {
+        QSKIP("OpenCV VideoWriter could not create the test AVI in this environment.");
+    }
+
+    VideoInputService service;
+    std::vector<std::shared_ptr<ImageBuffer>> frames;
+    bool finished = false;
+    connect(&service, &VideoInputService::frameReady, this,
+            [&frames](std::shared_ptr<ImageBuffer> frame) {
+                frames.push_back(std::move(frame));
+            });
+    connect(&service, &VideoInputService::playbackFinished, this,
+            [&finished]() {
+                finished = true;
+            });
+
+    QVERIFY(service.open(path));
+    service.setLoop(false);
+    service.setSpeed(10.0);
+    service.play();
+
+    QTRY_VERIFY_WITH_TIMEOUT(finished, 1500);
+    QVERIFY(!service.isPlaying());
+    QCOMPARE(frames.size(), std::size_t{3});
+}
+
+void TestVideoInputService::testTimerPlaybackLoopsWhenEnabled()
+{
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    const QString path = makeTestVideoOrEmpty(dir);
+    if (path.isEmpty()) {
+        QSKIP("OpenCV VideoWriter could not create the test AVI in this environment.");
+    }
+
+    VideoInputService service;
+    std::vector<std::shared_ptr<ImageBuffer>> frames;
+    connect(&service, &VideoInputService::frameReady, this,
+            [&frames](std::shared_ptr<ImageBuffer> frame) {
+                frames.push_back(std::move(frame));
+            });
+
+    QVERIFY(service.open(path));
+    service.setLoop(true);
+    service.setSpeed(10.0);
+    service.play();
+
+    QTRY_VERIFY_WITH_TIMEOUT(frames.size() >= std::size_t{4}, 2000);
+    service.pause();
+    QVERIFY(!service.isPlaying());
+    QVERIFY(frameMatchesRgb(frames[0], 30, 20, 10));
+    QVERIFY(frameMatchesRgb(frames[1], 60, 50, 40));
+    QVERIFY(frameMatchesRgb(frames[2], 90, 80, 70));
+    QVERIFY(frameMatchesRgb(frames[3], 30, 20, 10));
+}
+
+void TestVideoInputService::testInvalidSpeedFallsBackToNormalRate()
+{
+    VideoInputService service;
+
+    service.setSpeed(0.0);
+    QCOMPARE(service.speed(), 1.0);
+
+    service.setSpeed(-2.0);
+    QCOMPARE(service.speed(), 1.0);
 }
 
 void TestVideoInputService::testMissingFileReportsError()

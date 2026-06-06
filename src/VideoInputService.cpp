@@ -330,7 +330,7 @@ bool VideoInputService::loop() const
 
 void VideoInputService::setSpeed(double speed)
 {
-    speed_ = speed;
+    speed_ = std::isfinite(speed) && speed > 0.0 ? speed : 1.0;
     if (isPlaying()) {
         playTimer_->stop();
         play();  // restart with new speed

@@ -47,6 +47,9 @@ requirements.
 - Video file playback uses OpenCV `cv::VideoCapture` inside
   `VideoInputService` while preserving RGB/RGBA `ImageBuffer` output and the
   existing controller API.
+- Video file playback has automated coverage for generated-file metadata,
+  BGR-to-RGB conversion, stepping, seek-to-start delivery, timer playback,
+  loop-disabled EOF, loop-enabled restart, and invalid speed fallback.
 - Real-time streams still use the existing FFmpeg producer/reconnect path
   pending timeout and reconnect parity review.
 - The current public image boundary is `ImageBuffer`.
@@ -86,6 +89,11 @@ requirements.
   open, metadata, RGB frame conversion, EOF stepping, and missing-file errors.
   `cmake --build build` and `ctest --test-dir build --output-on-failure`
   passed after the migration.
+- 2026-06-06: OpenCV-backed video file playback coverage was extended for
+  seek-to-start delivery, timer play/pause, loop-disabled EOF finish,
+  loop-enabled restart, and invalid speed fallback. `cmake --build build` and
+  `ctest --test-dir build --output-on-failure` passed after the coverage
+  update.
 
 ## Source Evidence
 

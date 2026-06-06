@@ -228,6 +228,10 @@ Implemented file-video contract:
   frame, preserving the previous public behavior.
 - File EOF still returns no frame from `stepForward()` and lets timer playback
   handle loop or `playbackFinished()`.
+- Timer playback restarts the timer when playback speed changes, clamps invalid
+  non-positive speed input back to `1.0`, stops and emits
+  `playbackFinished()` at EOF when loop is disabled, and seeks to the first
+  frame before continuing when loop is enabled.
 - Real-time stream open, latest-frame display, disconnect, reconnect, timeout
   interrupt, and status reporting still use the existing FFmpeg path.
 
