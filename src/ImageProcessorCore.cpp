@@ -175,6 +175,18 @@ static cv::Mat mergeGrayToRgb(const cv::Mat& gray) {
     return rgb;
 }
 
+static cv::Mat rgbaGeometryMat(const ImageBuffer& src) {
+    const cv::Mat srcView = OpenCvImageBridge::constMatView(src);
+    if (srcView.empty())
+        return {};
+    if (src.channels == 4)
+        return srcView;
+
+    cv::Mat rgba;
+    cv::cvtColor(srcView, rgba, cv::COLOR_RGB2RGBA);
+    return rgba;
+}
+
 // Build the 28-algorithm spec table
 const std::vector<AlgorithmSpec>& ImageProcessorCore::specs() {
     static const std::vector<AlgorithmSpec> specs_table = {
@@ -357,22 +369,17 @@ bool ImageProcessorCore::apply(const ImageBuffer& src, ImageBuffer& dst,
     }
     case 7: { // Flip
         QString mode = params.value("mode", "H").toString();
-        if (mode == "H") {
-            for (int y = 0; y < H; ++y)
-                for (int x = 0; x < W; ++x)
-                    for (int c = 0; c < src.channels; ++c)
-                        setPx(dst, x, y, c, px(src, W - 1 - x, y, c));
-        } else if (mode == "V") {
-            for (int y = 0; y < H; ++y)
-                for (int x = 0; x < W; ++x)
-                    for (int c = 0; c < src.channels; ++c)
-                        setPx(dst, x, y, c, px(src, x, H - 1 - y, c));
-        } else { // "Both"
-            for (int y = 0; y < H; ++y)
-                for (int x = 0; x < W; ++x)
-                    for (int c = 0; c < src.channels; ++c)
-                        setPx(dst, x, y, c, px(src, W - 1 - x, H - 1 - y, c));
-        }
+        const cv::Mat srcView = OpenCvImageBridge::constMatView(src);
+        cv::Mat dstView = OpenCvImageBridge::mutableMatView(dst);
+        if (srcView.empty() || dstView.empty())
+            break;
+
+        int flipCode = -1;
+        if (mode == "H")
+            flipCode = 1;
+        else if (mode == "V")
+            flipCode = 0;
+        cv::flip(srcView, dstView, flipCode);
         break;
     }
     case 8: { // Rotate
@@ -458,22 +465,19 @@ bool ImageProcessorCore::apply(const ImageBuffer& src, ImageBuffer& dst,
         dst.channels = 4;
         dst.data.assign(outW * outH * 4, 0);
 
-        for (int dy = 0; dy < outH; ++dy) {
-            for (int dx = 0; dx < outW; ++dx) {
-                double tx = minBx + dx + 0.5;
-                double ty = minBy + dy + 0.5;
-                double sx = tx * cosA - ty * sinA + srcCx;
-                double sy = tx * sinA + ty * cosA + srcCy;
-                int sx_i = static_cast<int>(std::round(sx));
-                int sy_i = static_cast<int>(std::round(sy));
-                if (sx_i >= 0 && sx_i < W && sy_i >= 0 && sy_i < H) {
-                    for (int c = 0; c < 3; ++c)
-                        setPx(dst, dx, dy, c, px(src, sx_i, sy_i, c));
-                    uint8_t a = (src.channels >= 4) ? px(src, sx_i, sy_i, 3) : 255;
-                    setPx(dst, dx, dy, 3, a);
-                }
-            }
-        }
+        const cv::Mat srcRgba = rgbaGeometryMat(src);
+        cv::Mat dstView = OpenCvImageBridge::mutableMatView(dst);
+        if (srcRgba.empty() || dstView.empty())
+            break;
+
+        const double offsetX = minBx + 0.5;
+        const double offsetY = minBy + 0.5;
+        const cv::Matx23d dstToSrc(
+            cosA, -sinA, offsetX * cosA - offsetY * sinA + srcCx,
+            sinA,  cosA, offsetX * sinA + offsetY * cosA + srcCy);
+        cv::warpAffine(srcRgba, dstView, dstToSrc, cv::Size(outW, outH),
+                       cv::INTER_NEAREST | cv::WARP_INVERSE_MAP,
+                       cv::BORDER_CONSTANT, cv::Scalar(0, 0, 0, 0));
         break;
     }
     case 9: { // Emboss

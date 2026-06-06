@@ -44,10 +44,12 @@ private slots:
     void testOpenCvAlgorithmsAcceptEmptyImage();
     void testOpenCvPointPreservesAlphaAndClearsTransparentRgb();
     void testFlipH();
+    void testOpenCvFlipPreservesAlphaAndClearsTransparentRgb();
     void testRotate90ExpandsCanvas();
     void testRotate180KeepsCanvasSize();
     void testRotateArbitraryAngleExpandsCanvas();
     void testRotatePreservesTransparentBackground();
+    void testRotateThenBrightnessKeepsTransparentBackground();
     void testRotateUsesVisibleAlphaBounds();
     void testRotateRepeatedDoesNotShrink();
     void testRotateOutputIsAlways4Channel();
@@ -177,6 +179,24 @@ void TestImageProcessorCore::testFlipH() {
     QCOMPARE(getPx(dst, 1, 0, 0), (uint8_t)255);
 }
 
+void TestImageProcessorCore::testOpenCvFlipPreservesAlphaAndClearsTransparentRgb() {
+    auto src = makeRgbaImage();
+    ImageBuffer dst;
+    EffectParams p;
+    p["mode"] = "H";
+    ImageProcessorCore::apply(src, dst, 7, p);
+
+    QCOMPARE(dst.channels, 4);
+    QCOMPARE(getPx(dst, 0, 0, 0), (uint8_t)10);
+    QCOMPARE(getPx(dst, 0, 0, 1), (uint8_t)20);
+    QCOMPARE(getPx(dst, 0, 0, 2), (uint8_t)30);
+    QCOMPARE(getPx(dst, 0, 0, 3), (uint8_t)128);
+    QCOMPARE(getPx(dst, 1, 0, 0), (uint8_t)0);
+    QCOMPARE(getPx(dst, 1, 0, 1), (uint8_t)0);
+    QCOMPARE(getPx(dst, 1, 0, 2), (uint8_t)0);
+    QCOMPARE(getPx(dst, 1, 0, 3), (uint8_t)0);
+}
+
 void TestImageProcessorCore::testRotate90ExpandsCanvas() {
     ImageBuffer src;
     src.width = 2;
@@ -247,6 +267,26 @@ void TestImageProcessorCore::testRotatePreservesTransparentBackground() {
     QCOMPARE(dst.channels, 4);
     QVERIFY(std::any_of(dst.data.begin(), dst.data.end(), [](uint8_t v) { return v == 255; }));
     QCOMPARE(getPx(dst, 0, 0, 3), (uint8_t)0);
+}
+
+void TestImageProcessorCore::testRotateThenBrightnessKeepsTransparentBackground() {
+    auto src = makeImage(20, 20, 120, 80, 40);
+
+    ImageBuffer rotated;
+    EffectParams rotateParams;
+    rotateParams["degree"] = 45.0;
+    ImageProcessorCore::apply(src, rotated, 8, rotateParams);
+
+    ImageBuffer brightened;
+    EffectParams brightnessParams;
+    brightnessParams["delta"] = 60;
+    ImageProcessorCore::apply(rotated, brightened, 1, brightnessParams);
+
+    QCOMPARE(brightened.channels, 4);
+    QCOMPARE(getPx(brightened, 0, 0, 0), (uint8_t)0);
+    QCOMPARE(getPx(brightened, 0, 0, 1), (uint8_t)0);
+    QCOMPARE(getPx(brightened, 0, 0, 2), (uint8_t)0);
+    QCOMPARE(getPx(brightened, 0, 0, 3), (uint8_t)0);
 }
 
 void TestImageProcessorCore::testRotateUsesVisibleAlphaBounds() {

@@ -56,8 +56,9 @@ contracts stable.
 
 Suggested order:
 
-1. Point and grayscale operations.
-2. Flip and rotate geometry.
+1. Point and grayscale operations. Implemented for IDs `1`, `2`, `3`, `4`,
+   `6`, `26`, `27`, and `28`.
+2. Flip and rotate geometry. Implemented for IDs `7` and `8`.
 3. Blur, sharpen, smoothing, and morphology.
 4. Edge and frequency-like filters.
 5. Statistics-dependent algorithms.
@@ -67,6 +68,16 @@ Exit criteria:
 - Each migrated group has parity tests or documented tolerances.
 - Transparent pixels remain transparent after post-rotate stacks.
 - Repeated rotate does not grow the transparent canvas indefinitely.
+
+Implementation note:
+
+- Point and grayscale paths use OpenCV `cv::Mat` operations while preserving
+  alpha and clearing RGB for fully transparent pixels.
+- Flip uses `cv::flip` and remains dimension-preserving.
+- Rotate uses `cv::warpAffine` with the existing alpha-content bounds policy,
+  nearest-neighbor sampling, RGBA output, and transparent constant borders.
+- Statistics-dependent IDs `5`, `10`, and `23` remain on the legacy loop path
+  until the statistics contract is migrated.
 
 ## Phase 3: Migrate Image I/O
 

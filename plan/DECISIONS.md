@@ -121,3 +121,34 @@ copy, and color-order contract between `ImageBuffer` and OpenCV.
 
 Consequence: future OpenCV-backed code should use the bridge instead of
 constructing ad hoc `cv::Mat` wrappers around `ImageBuffer` data.
+
+## D-010: Migrate Alpha-Safe CPU Algorithm Groups First
+
+Status: verified
+
+Decision: migrate simple point, grayscale, and geometry CPU paths before
+statistics-dependent filters.
+
+Reason: these algorithms exercise the OpenCV bridge, saturation, rounding,
+alpha preservation, and transparent RGB cleanup without also changing automatic
+statistics semantics.
+
+Consequence: IDs `1`, `2`, `3`, `4`, `6`, `7`, `8`, `26`, `27`, and `28` are
+OpenCV-backed, while IDs `5`, `10`, and `23` remain legacy until the statistics
+contract is specified and tested.
+
+## D-011: Preserve Rotate Bounds And Stack Transparency With warpAffine
+
+Status: verified
+
+Decision: use `cv::warpAffine` for arbitrary-angle CPU rotate, but keep the
+existing output-size and alpha-content bounds calculation.
+
+Reason: OpenCV should own the sampling operation, while the application still
+needs the established rotate contract: geometry-changing RGBA output,
+transparent constant borders, and bounded repeated rotations after an RGBA
+rotate.
+
+Consequence: later color, grayscale, blur, sharpen, and morphology operations
+must continue to treat `alpha == 0` pixels as protected background and clear RGB
+after processing.

@@ -64,6 +64,13 @@ regressions:
 - `Rotate -> Sharpen` keeps rotate in the CPU prefix and allows sharpen in an
   accelerated suffix only if supported.
 
+Current automated coverage:
+
+- `tst_ImageProcessorCore` covers RGB rotate output as RGBA, transparent
+  rotate borders, alpha-content rotate bounds, repeated rotate bounds, OpenCV
+  flip alpha preservation, and `Rotate -> Brightness` transparent-background
+  cleanup.
+
 ## Video And Stream Acceptance
 
 Video file behavior must cover:

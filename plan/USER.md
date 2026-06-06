@@ -12,6 +12,9 @@ Status: generated
   not pytest.
 - OpenCV 4.13.0 is available through CMake in the `videoprocess` Conda
   environment for the Phase 1 `core` and `imgproc` modules.
+- The local CMake configure/build may warn that `WrapVulkanHeaders` is missing
+  because `Vulkan_INCLUDE_DIR` is not set. This has not blocked the current
+  Qt/OpenCV build or CTest suite.
 
 ## User Decisions Needed
 
@@ -40,6 +43,7 @@ are confirmed in this workspace. Do not replace execution with documentation.
 
 - `cmake -S . -B build`
 - `cmake --build build`
+- `ctest --test-dir build --output-on-failure`
 - `./build/tst_OpenCvImageBridge`
 - `./build/tst_ImageProcessorCore`
 - `QT_QPA_PLATFORM=offscreen ./build/tst_ImageIoService`
