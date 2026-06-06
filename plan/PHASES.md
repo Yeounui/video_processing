@@ -48,7 +48,7 @@ Implementation note:
 
 ## Phase 2: Migrate CPU Algorithms
 
-Status: generated
+Status: verified
 
 Replace hand-written CPU algorithms with OpenCV-backed implementations in small
 groups while keeping algorithm IDs, names, parameter keys, defaults, and output
@@ -95,7 +95,7 @@ Implementation note:
 
 ## Phase 3: Migrate Image I/O
 
-Status: generated
+Status: verified
 
 Move still-image load/save behind OpenCV `imgcodecs` while preserving the
 application's RGB/RGBA `ImageBuffer` contract.
@@ -107,6 +107,20 @@ Exit criteria:
 - Unsupported or failed loads report errors without changing controller state.
 - Metadata/EXIF orientation behavior is either implemented or explicitly out of
   scope.
+
+Implementation note:
+
+- `ImageIoService` now uses OpenCV `cv::imread` and `cv::imwrite`.
+- Loads accept 8-bit grayscale, BGR, and BGRA decoded images; grayscale is
+  expanded to RGB, and BGR/BGRA is converted to RGB/RGBA before returning an
+  `ImageBuffer`.
+- Saves accept valid non-empty 3-channel RGB and 4-channel RGBA `ImageBuffer`
+  instances, convert them to OpenCV BGR/BGRA, and return `false` for invalid
+  buffers, unsupported writers, or encoder failures.
+- JPEG saves drop alpha before encoding to preserve the previous practical
+  behavior of saving color-only JPEG output from RGBA buffers.
+- Metadata, EXIF orientation, and animated image handling are out of scope for
+  this migration step.
 
 ## Phase 4: Migrate Video Capture
 

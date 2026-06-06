@@ -11,7 +11,7 @@ Status: generated
 - Existing stop-hook verification in this workspace uses CMake build and CTest,
   not pytest.
 - OpenCV 4.13.0 is available through CMake in the `videoprocess` Conda
-  environment for the Phase 1 `core` and `imgproc` modules.
+  environment for the current `core`, `imgproc`, and `imgcodecs` modules.
 - The local CMake configure/build may warn that `WrapVulkanHeaders` is missing
   because `Vulkan_INCLUDE_DIR` is not set. This has not blocked the current
   Qt/OpenCV build or CTest suite.

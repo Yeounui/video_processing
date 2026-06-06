@@ -74,6 +74,9 @@ Current automated coverage:
   `Rotate -> Edge` transparent-background cleanup, OpenCV statistics alpha
   preservation, and flat-range statistics copy behavior with transparent RGB
   cleanup.
+- `tst_ImageIoService` covers OpenCV-backed RGB PNG load color order,
+  transparent PNG alpha preservation, RGB and RGBA PNG save/load round trips,
+  missing-file load failure, and invalid-buffer save failure.
 
 ## Video And Stream Acceptance
 

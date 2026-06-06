@@ -6,7 +6,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 find_package(Qt6 REQUIRED COMPONENTS Core Gui Qml Quick QuickControls2)
-find_package(OpenCV REQUIRED COMPONENTS core imgproc)
+find_package(OpenCV REQUIRED COMPONENTS core imgproc imgcodecs)
 
 # FFmpeg prefix comes from the local shell environment. For this repo, source
 # .env before configuring or build from an activated Conda environment.
@@ -122,10 +122,13 @@ if(Qt6Test_FOUND AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests")
         tests/tst_ImageIoService.cpp
         include/ImageIoService.h
         src/ImageIoService.cpp
+        include/OpenCvImageBridge.h
+        src/OpenCvImageBridge.cpp
         include/ImageBuffer.h
     )
     target_include_directories(tst_ImageIoService PRIVATE include)
-    target_link_libraries(tst_ImageIoService PRIVATE Qt6::Core Qt6::Gui Qt6::Test)
+    target_include_directories(tst_ImageIoService PRIVATE ${OpenCV_INCLUDE_DIRS})
+    target_link_libraries(tst_ImageIoService PRIVATE Qt6::Core Qt6::Gui Qt6::Test ${OpenCV_LIBS})
     add_test(NAME tst_ImageIoService COMMAND tst_ImageIoService)
     set_tests_properties(tst_ImageIoService PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 

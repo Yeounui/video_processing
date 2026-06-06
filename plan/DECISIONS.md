@@ -207,3 +207,22 @@ are generated with the legacy arithmetic ordering, `clamp8` rounding, and
 saturation policy. Flat statistic ranges copy RGB from the source while
 preserving alpha and still clear RGB for fully transparent pixels before
 returning.
+
+## D-015: ImageIoService Uses OpenCV imgcodecs
+
+Status: verified
+
+Decision: migrate still-image load/save from QImage to OpenCV `imgcodecs` while
+keeping `ImageBuffer` as the controller-facing RGB/RGBA boundary.
+
+Reason: image I/O should use the same OpenCV bridge and color-order contract as
+the migrated processing path. This keeps BGR/BGRA conversion local to I/O and
+prevents OpenCV channel order from leaking into controller or viewport state.
+
+Consequence: `ImageIoService` decodes through `cv::imread`, converts 8-bit
+grayscale/BGR/BGRA inputs to RGB/RGBA `ImageBuffer` output, and encodes through
+`cv::imwrite` after converting RGB/RGBA to BGR/BGRA. Invalid buffers, failed
+loads, unsupported layouts, and encoder exceptions return `nullptr` or `false`
+without changing the public API. PNG RGB/RGBA round trips are covered by tests;
+metadata preservation, EXIF auto-orientation, color profiles, and animated
+formats remain out of scope for this phase.

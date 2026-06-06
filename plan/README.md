@@ -16,7 +16,7 @@ requirements.
 | --- | --- | --- | --- |
 | [[README]] | generated | Current status, document map, source evidence, and open questions. | Review generated status and source evidence. |
 | [[OVERVIEW]] | generated | Goal, scope, non-goals, and constraints. | Review scope before implementation. |
-| [[PHASES]] | generated | Suggested implementation order and phase gates. | Continue Phase 2 CPU algorithm migration. |
+| [[PHASES]] | generated | Suggested implementation order and phase gates. | Continue Phase 4 video capture evaluation. |
 | [[ARCHITECTURE]] | generated | Qt/OpenCV boundary, data model, algorithm stack model, and required specs. | Resolve open questions before code changes. |
 | [[DECISIONS]] | generated | Decisions extracted from current plan notes and existing code behavior. | Add decisions as migration behavior changes. |
 | [[REVIEW]] | generated | Parity, QA, benchmark, and regression policy. | Turn acceptance cases into tests/manual checks. |
@@ -26,6 +26,8 @@ requirements.
 
 - Phase 1 is verified with an `ImageBuffer` / `cv::Mat` bridge.
 - Phase 2 CPU migration is implemented in `ImageProcessorCore`.
+- Phase 3 still-image load/save is implemented in `ImageIoService` with OpenCV
+  `imgcodecs`.
 - Algorithm IDs `1` through `28` currently use OpenCV-backed CPU paths.
 - Rotate remains geometry-materializing, always outputs RGBA, and keeps
   transparent borders `(0, 0, 0, 0)` for later stack operations.
@@ -36,9 +38,15 @@ requirements.
   data only, preserve source alpha, and clear RGB for fully transparent pixels.
 - Statistics-dependent algorithms consume CPU-computed `stat_*` parameters and
   apply them through OpenCV mask/LUT operations while preserving alpha.
+- Still-image I/O uses OpenCV `cv::imread` and `cv::imwrite`; the public
+  boundary remains RGB/RGBA `ImageBuffer`.
+- Image loads accept 8-bit grayscale, BGR, and BGRA decoded images, expanding
+  grayscale to RGB and converting BGR/BGRA to RGB/RGBA.
+- Image saves reject invalid or empty buffers, convert RGB/RGBA to BGR/BGRA for
+  OpenCV, and drop alpha for JPEG output.
 - The current public image boundary is `ImageBuffer`.
-- OpenCV 4.13.0 is found in the `videoprocess` Conda environment for `core`
-  and `imgproc`.
+- OpenCV 4.13.0 is found in the `videoprocess` Conda environment for `core`,
+  `imgproc`, and `imgcodecs`.
 - Current GPU processing uses `GpuEffectPipeline` for a subset of algorithms.
 - Current video stack optimization uses a CPU prefix plus GPU suffix model.
 - Plan documents are intended to be tracked through the `.gitignore`
@@ -63,6 +71,10 @@ requirements.
   while preserving CPU-computed `stat_*` parameter semantics and flat-range
   copy behavior. `cmake --build build` and
   `ctest --test-dir build --output-on-failure` passed after the migration.
+- 2026-06-06: still-image load/save was migrated from QImage to OpenCV
+  `imgcodecs` while preserving RGB/RGBA `ImageBuffer` color order, PNG alpha
+  round trips, and failure behavior. `cmake --build build` and
+  `ctest --test-dir build --output-on-failure` passed after the migration.
 
 ## Source Evidence
 
@@ -74,6 +86,7 @@ requirements.
 - Current viewport GPU suffix handoff: `src/ProcessingViewportItem.cpp`
 - Stack support tests: `tests/tst_ProcessingController.cpp`
 - Bridge tests: `tests/tst_OpenCvImageBridge.cpp`
+- Image I/O tests: `tests/tst_ImageIoService.cpp`
 - Prior local commits inspected:
   - `07906a5 Accelerate video effect stacks`
   - `fc7686b Reduce median and hybrid stack bottlenecks`

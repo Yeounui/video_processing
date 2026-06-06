@@ -219,6 +219,30 @@ The OpenCV image I/O path must define:
 - Whether metadata or EXIF orientation is honored.
 - Whether animated image formats are out of scope.
 
+Implemented Phase 3 contract:
+
+- Still-image I/O is implemented by `ImageIoService` through OpenCV
+  `imgcodecs`.
+- Supported formats are the formats provided by the linked OpenCV `imgcodecs`
+  build; tests lock PNG RGB/RGBA behavior because it is the lossless reference
+  format used for parity checks.
+- Load uses `cv::imread(..., cv::IMREAD_UNCHANGED)`.
+- Loaded 8-bit grayscale images are expanded to 3-channel RGB.
+- Loaded 8-bit BGR and BGRA images are converted to RGB and RGBA before leaving
+  `ImageIoService`.
+- Unsupported channel counts, non-8-bit decoded images, missing files, and
+  decoder failures return `nullptr`.
+- Save accepts only valid, non-empty 3-channel RGB or 4-channel RGBA
+  `ImageBuffer` values.
+- Save converts RGB/RGBA to BGR/BGRA before calling `cv::imwrite`.
+- RGBA JPEG output drops alpha before encoding because JPEG has no alpha
+  channel and the previous QImage save path effectively produced color-only
+  JPEG output.
+- Encoder failures, unsupported writers, invalid buffers, and thrown OpenCV
+  exceptions return `false`.
+- Metadata preservation, EXIF auto-orientation, color profiles, and animated
+  image formats are out of scope for this phase.
+
 ## Statistics Spec
 
 Automatic parameters depend on image statistics. The OpenCV path must define:
