@@ -98,10 +98,13 @@ if(Qt6Test_FOUND AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests")
         tests/tst_ImageProcessorCore.cpp
         include/ImageProcessorCore.h
         src/ImageProcessorCore.cpp
+        include/OpenCvImageBridge.h
+        src/OpenCvImageBridge.cpp
         include/ImageBuffer.h
     )
     target_include_directories(tst_ImageProcessorCore PRIVATE include)
-    target_link_libraries(tst_ImageProcessorCore PRIVATE Qt6::Core Qt6::Test)
+    target_include_directories(tst_ImageProcessorCore PRIVATE ${OpenCV_INCLUDE_DIRS})
+    target_link_libraries(tst_ImageProcessorCore PRIVATE Qt6::Core Qt6::Test ${OpenCV_LIBS})
     add_test(NAME tst_ImageProcessorCore COMMAND tst_ImageProcessorCore)
 
     qt_add_executable(tst_OpenCvImageBridge

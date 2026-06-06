@@ -1,8 +1,14 @@
 #include "ImageProcessorCore.h"
+#include "OpenCvImageBridge.h"
+
+#include <opencv2/core.hpp>
+#include <opencv2/imgproc.hpp>
+
 #include <cmath>
 #include <algorithm>
 #include <limits>
 #include <numeric>
+#include <vector>
 
 // Luminance formula: Y = 0.299*R + 0.587*G + 0.114*B
 inline double lum(uint8_t r, uint8_t g, uint8_t b) {
@@ -113,6 +119,60 @@ static void gaussianBlur(const ImageBuffer& src, ImageBuffer& dst, int kernelSiz
                     acc += k[ki] * px(tmp, x, y + ki - half, c);
                 setPx(dst, x, y, c, clamp8(acc));
             }
+}
+
+static cv::Mat rgbChannelsMat(const ImageBuffer& src) {
+    const cv::Mat srcView = OpenCvImageBridge::constMatView(src);
+    if (srcView.empty())
+        return {};
+    if (src.channels == 3)
+        return srcView;
+
+    std::vector<cv::Mat> channels;
+    cv::split(srcView, channels);
+    cv::Mat rgb;
+    cv::merge(std::vector<cv::Mat>{channels[0], channels[1], channels[2]}, rgb);
+    return rgb;
+}
+
+static bool writeRgbChannels(const cv::Mat& rgb, ImageBuffer& dst) {
+    if (rgb.empty())
+        return true;
+
+    cv::Mat dstView = OpenCvImageBridge::mutableMatView(dst);
+    if (dstView.empty())
+        return false;
+
+    if (dst.channels == 3) {
+        rgb.copyTo(dstView);
+        return true;
+    }
+
+    std::vector<cv::Mat> dstChannels;
+    std::vector<cv::Mat> rgbChannels;
+    cv::split(dstView, dstChannels);
+    cv::split(rgb, rgbChannels);
+    dstChannels[0] = rgbChannels[0];
+    dstChannels[1] = rgbChannels[1];
+    dstChannels[2] = rgbChannels[2];
+    cv::merge(dstChannels, dstView);
+    return true;
+}
+
+static cv::Mat luminanceMat(const cv::Mat& rgb) {
+    cv::Mat rgb64;
+    rgb.convertTo(rgb64, CV_64F);
+
+    cv::Mat luminance;
+    cv::transform(rgb64, luminance,
+                  cv::Matx<double, 1, 3>(0.299, 0.587, 0.114));
+    return luminance;
+}
+
+static cv::Mat mergeGrayToRgb(const cv::Mat& gray) {
+    cv::Mat rgb;
+    cv::merge(std::vector<cv::Mat>{gray, gray, gray}, rgb);
+    return rgb;
 }
 
 // Build the 28-algorithm spec table
@@ -228,42 +288,49 @@ bool ImageProcessorCore::apply(const ImageBuffer& src, ImageBuffer& dst,
     switch (algorithmId) {
     case 1: { // Brightness
         int delta = params.value("delta", 30).toInt();
-        for (int y = 0; y < H; ++y)
-            for (int x = 0; x < W; ++x)
-                for (int c = 0; c < 3; ++c)
-                    setPx(dst, x, y, c, clamp8(px(src, x, y, c) + delta));
+        const cv::Mat rgb = rgbChannelsMat(src);
+        if (rgb.empty())
+            break;
+        cv::Mat result;
+        cv::add(rgb, cv::Scalar(delta, delta, delta), result);
+        writeRgbChannels(result, dst);
         break;
     }
     case 2: { // Multiply
         double factor = params.value("factor", 1.2).toDouble();
-        for (int y = 0; y < H; ++y)
-            for (int x = 0; x < W; ++x)
-                for (int c = 0; c < 3; ++c)
-                    setPx(dst, x, y, c, clamp8(px(src, x, y, c) * factor));
+        const cv::Mat rgb = rgbChannelsMat(src);
+        if (rgb.empty())
+            break;
+        cv::Mat result;
+        rgb.convertTo(result, CV_8U, factor);
+        writeRgbChannels(result, dst);
         break;
     }
     case 3: { // Gamma
         double gamma = params.value("gamma", 2.2).toDouble();
-        for (int y = 0; y < H; ++y)
-            for (int x = 0; x < W; ++x)
-                for (int c = 0; c < 3; ++c) {
-                    uint8_t v = px(src, x, y, c);
-                    double normalized = v / 255.0;
-                    double corrected = std::pow(normalized, 1.0 / gamma) * 255.0;
-                    setPx(dst, x, y, c, clamp8(corrected));
-                }
+        cv::Mat lut(1, 256, CV_8UC1);
+        for (int i = 0; i < 256; ++i) {
+            double normalized = i / 255.0;
+            double corrected = std::pow(normalized, 1.0 / gamma) * 255.0;
+            lut.at<uint8_t>(0, i) = clamp8(corrected);
+        }
+
+        const cv::Mat rgb = rgbChannelsMat(src);
+        if (rgb.empty())
+            break;
+        cv::Mat result;
+        cv::LUT(rgb, lut, result);
+        writeRgbChannels(result, dst);
         break;
     }
     case 4: { // Fixed Threshold
         int threshold = params.value("threshold", 127).toInt();
-        for (int y = 0; y < H; ++y)
-            for (int x = 0; x < W; ++x) {
-                double l = lum(px(src, x, y, 0), px(src, x, y, 1), px(src, x, y, 2));
-                uint8_t v = (l >= threshold) ? 255 : 0;
-                setPx(dst, x, y, 0, v);
-                setPx(dst, x, y, 1, v);
-                setPx(dst, x, y, 2, v);
-            }
+        const cv::Mat rgb = rgbChannelsMat(src);
+        if (rgb.empty())
+            break;
+        cv::Mat mask;
+        cv::compare(luminanceMat(rgb), cv::Scalar(threshold), mask, cv::CMP_GE);
+        writeRgbChannels(mergeGrayToRgb(mask), dst);
         break;
     }
     case 5: { // Average Threshold
@@ -280,10 +347,12 @@ bool ImageProcessorCore::apply(const ImageBuffer& src, ImageBuffer& dst,
     }
     case 6: { // Bitwise AND
         int mask = params.value("mask", 0xC9).toInt();
-        for (int y = 0; y < H; ++y)
-            for (int x = 0; x < W; ++x)
-                for (int c = 0; c < 3; ++c)
-                    setPx(dst, x, y, c, px(src, x, y, c) & mask);
+        const cv::Mat rgb = rgbChannelsMat(src);
+        if (rgb.empty())
+            break;
+        cv::Mat result;
+        cv::bitwise_and(rgb, cv::Scalar(mask, mask, mask), result);
+        writeRgbChannels(result, dst);
         break;
     }
     case 7: { // Flip
@@ -660,44 +729,47 @@ bool ImageProcessorCore::apply(const ImageBuffer& src, ImageBuffer& dst,
         break;
     }
     case 26: { // Grayscale Average
-        for (int y = 0; y < H; ++y)
-            for (int x = 0; x < W; ++x) {
-                uint8_t r = px(src, x, y, 0);
-                uint8_t g = px(src, x, y, 1);
-                uint8_t b = px(src, x, y, 2);
-                uint8_t g_val = clamp8((r + g + b) / 3.0);
-                setPx(dst, x, y, 0, g_val);
-                setPx(dst, x, y, 1, g_val);
-                setPx(dst, x, y, 2, g_val);
-            }
+        const cv::Mat rgb = rgbChannelsMat(src);
+        if (rgb.empty())
+            break;
+        cv::Mat rgb64;
+        rgb.convertTo(rgb64, CV_64F);
+        cv::Mat gray64;
+        cv::transform(rgb64, gray64,
+                      cv::Matx<double, 1, 3>(1.0 / 3.0, 1.0 / 3.0, 1.0 / 3.0));
+        cv::Mat gray;
+        gray64.convertTo(gray, CV_8U);
+        writeRgbChannels(mergeGrayToRgb(gray), dst);
         break;
     }
     case 27: { // Grayscale Luminosity
-        for (int y = 0; y < H; ++y)
-            for (int x = 0; x < W; ++x) {
-                uint8_t r = px(src, x, y, 0);
-                uint8_t g = px(src, x, y, 1);
-                uint8_t b = px(src, x, y, 2);
-                uint8_t g_val = clamp8(lum(r, g, b));
-                setPx(dst, x, y, 0, g_val);
-                setPx(dst, x, y, 1, g_val);
-                setPx(dst, x, y, 2, g_val);
-            }
+        const cv::Mat rgb = rgbChannelsMat(src);
+        if (rgb.empty())
+            break;
+        cv::Mat gray;
+        luminanceMat(rgb).convertTo(gray, CV_8U);
+        writeRgbChannels(mergeGrayToRgb(gray), dst);
         break;
     }
     case 28: { // Grayscale Lightness
-        for (int y = 0; y < H; ++y)
-            for (int x = 0; x < W; ++x) {
-                uint8_t r = px(src, x, y, 0);
-                uint8_t g = px(src, x, y, 1);
-                uint8_t b = px(src, x, y, 2);
-                uint8_t maxv = std::max({r, g, b});
-                uint8_t minv = std::min({r, g, b});
-                uint8_t g_val = clamp8((maxv + minv) / 2.0);
-                setPx(dst, x, y, 0, g_val);
-                setPx(dst, x, y, 1, g_val);
-                setPx(dst, x, y, 2, g_val);
-            }
+        const cv::Mat rgb = rgbChannelsMat(src);
+        if (rgb.empty())
+            break;
+        std::vector<cv::Mat> channels;
+        cv::split(rgb, channels);
+
+        cv::Mat maxRg;
+        cv::Mat maxRgb;
+        cv::Mat minRg;
+        cv::Mat minRgb;
+        cv::max(channels[0], channels[1], maxRg);
+        cv::max(maxRg, channels[2], maxRgb);
+        cv::min(channels[0], channels[1], minRg);
+        cv::min(minRg, channels[2], minRgb);
+
+        cv::Mat gray;
+        cv::addWeighted(maxRgb, 0.5, minRgb, 0.5, 0.0, gray);
+        writeRgbChannels(mergeGrayToRgb(gray), dst);
         break;
     }
     }

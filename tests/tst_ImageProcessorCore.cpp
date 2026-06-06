@@ -16,6 +16,18 @@ static ImageBuffer makeImage(int w, int h, uint8_t r, uint8_t g, uint8_t b) {
     return img;
 }
 
+static ImageBuffer makeRgbaImage() {
+    ImageBuffer img;
+    img.width = 2;
+    img.height = 1;
+    img.channels = 4;
+    img.data = {
+        100, 50, 25, 0,
+        10, 20, 30, 128
+    };
+    return img;
+}
+
 static uint8_t getPx(const ImageBuffer& img, int x, int y, int c) {
     return img.data[(y * img.width + x) * img.channels + c];
 }
@@ -29,6 +41,8 @@ private slots:
     void testGammaIdentity();
     void testFixedThreshold();
     void testBitwiseAnd();
+    void testOpenCvAlgorithmsAcceptEmptyImage();
+    void testOpenCvPointPreservesAlphaAndClearsTransparentRgb();
     void testFlipH();
     void testRotate90ExpandsCanvas();
     void testRotate180KeepsCanvasSize();
@@ -41,6 +55,7 @@ private slots:
     void testGrayscaleAverage();
     void testGrayscaleLuminosity();
     void testGrayscaleLightness();
+    void testOpenCvGrayscalePreservesAlphaAndClearsTransparentRgb();
     void testContrastStretch();
     void testSpecsCount();
     void testSpecsIds();
@@ -116,6 +131,34 @@ void TestImageProcessorCore::testBitwiseAnd() {
     QCOMPARE(getPx(dst, 0, 0, 0), (uint8_t)0xF0);
     QCOMPARE(getPx(dst, 0, 0, 1), (uint8_t)0xA0);
     QCOMPARE(getPx(dst, 0, 0, 2), (uint8_t)0x50);
+}
+
+void TestImageProcessorCore::testOpenCvAlgorithmsAcceptEmptyImage() {
+    ImageBuffer src;
+    ImageBuffer dst;
+    QVERIFY(ImageProcessorCore::apply(src, dst, 1, EffectParams{}));
+    QCOMPARE(dst.width, 0);
+    QCOMPARE(dst.height, 0);
+    QCOMPARE(dst.channels, 3);
+    QVERIFY(dst.data.empty());
+}
+
+void TestImageProcessorCore::testOpenCvPointPreservesAlphaAndClearsTransparentRgb() {
+    auto src = makeRgbaImage();
+    ImageBuffer dst;
+    EffectParams p;
+    p["delta"] = 20;
+    ImageProcessorCore::apply(src, dst, 1, p);
+
+    QCOMPARE(dst.channels, 4);
+    QCOMPARE(getPx(dst, 0, 0, 0), (uint8_t)0);
+    QCOMPARE(getPx(dst, 0, 0, 1), (uint8_t)0);
+    QCOMPARE(getPx(dst, 0, 0, 2), (uint8_t)0);
+    QCOMPARE(getPx(dst, 0, 0, 3), (uint8_t)0);
+    QCOMPARE(getPx(dst, 1, 0, 0), (uint8_t)30);
+    QCOMPARE(getPx(dst, 1, 0, 1), (uint8_t)40);
+    QCOMPARE(getPx(dst, 1, 0, 2), (uint8_t)50);
+    QCOMPARE(getPx(dst, 1, 0, 3), (uint8_t)128);
 }
 
 void TestImageProcessorCore::testFlipH() {
@@ -306,6 +349,22 @@ void TestImageProcessorCore::testGrayscaleLightness() {
     ImageBuffer dst;
     ImageProcessorCore::apply(src, dst, 28, EffectParams{});
     QCOMPARE(getPx(dst, 0, 0, 0), (uint8_t)125);
+}
+
+void TestImageProcessorCore::testOpenCvGrayscalePreservesAlphaAndClearsTransparentRgb() {
+    auto src = makeRgbaImage();
+    ImageBuffer dst;
+    ImageProcessorCore::apply(src, dst, 26, EffectParams{});
+
+    QCOMPARE(dst.channels, 4);
+    QCOMPARE(getPx(dst, 0, 0, 0), (uint8_t)0);
+    QCOMPARE(getPx(dst, 0, 0, 1), (uint8_t)0);
+    QCOMPARE(getPx(dst, 0, 0, 2), (uint8_t)0);
+    QCOMPARE(getPx(dst, 0, 0, 3), (uint8_t)0);
+    QCOMPARE(getPx(dst, 1, 0, 0), (uint8_t)20);
+    QCOMPARE(getPx(dst, 1, 0, 1), (uint8_t)20);
+    QCOMPARE(getPx(dst, 1, 0, 2), (uint8_t)20);
+    QCOMPARE(getPx(dst, 1, 0, 3), (uint8_t)128);
 }
 
 void TestImageProcessorCore::testContrastStretch() {
