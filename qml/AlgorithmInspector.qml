@@ -38,8 +38,8 @@ Rectangle {
                     id: categoryTabDelegate
 
                     Rectangle {
-                        width: Math.max(38, tabLabel.implicitWidth + 8)
-                        height: 24
+                        width: Math.max(44, tabLabel.implicitWidth + 10)
+                        height: 25
                         radius: 4
                         color: ProcessingController.algorithmModel.category === modelData ? "#6F86AB" : "#FFFFFF"
                         border.color: ProcessingController.algorithmModel.category === modelData ? "transparent" : "#E5E8EB"
@@ -49,7 +49,7 @@ Rectangle {
                                 id: tabLabel
                                 anchors.centerIn: parent
                                 text: modelData
-                                font.pixelSize: 10
+                                font.pixelSize: 11
                                 color: ProcessingController.algorithmModel.category === modelData ? "#FFFFFF" : "#2F3438"
                             }
 
@@ -173,7 +173,7 @@ Rectangle {
 
                 Button {
                     id: applyButton
-                    Layout.fillWidth: true
+                    Layout.preferredWidth: 56
                     text: "Apply"
                     enabled: root.selectedAlgorithmId > 0 && ProcessingController.hasImage
                     implicitHeight: 30
@@ -191,6 +191,10 @@ Rectangle {
                         horizontalAlignment: Text.AlignHCenter
                         verticalAlignment: Text.AlignVCenter
                     }
+                }
+
+                Item {
+                    Layout.fillWidth: true
                 }
 
                 Button {
