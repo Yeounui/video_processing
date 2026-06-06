@@ -6,6 +6,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 find_package(Qt6 REQUIRED COMPONENTS Core Gui Qml Quick QuickControls2)
+find_package(OpenCV REQUIRED COMPONENTS core imgproc)
 
 # FFmpeg prefix comes from the local shell environment. For this repo, source
 # .env before configuring or build from an activated Conda environment.
@@ -62,12 +63,15 @@ qt_add_qml_module(qt_ui
         src/ProcessingViewportItem.cpp
         include/ImageProcessorCore.h
         src/ImageProcessorCore.cpp
+        include/OpenCvImageBridge.h
+        src/OpenCvImageBridge.cpp
         include/GpuEffectPipeline.h
         src/GpuEffectPipeline.cpp
 )
 
 target_include_directories(qt_ui PRIVATE include)
 target_include_directories(qt_ui PRIVATE "${FFMPEG_PREFIX}/include")
+target_include_directories(qt_ui PRIVATE ${OpenCV_INCLUDE_DIRS})
 
 target_link_libraries(qt_ui
     PRIVATE
@@ -76,6 +80,7 @@ target_link_libraries(qt_ui
         Qt6::Qml
         Qt6::Quick
         Qt6::QuickControls2
+        ${OpenCV_LIBS}
         ${AVFORMAT_LIB} ${AVCODEC_LIB} ${AVUTIL_LIB} ${SWSCALE_LIB}
         x264_compat
 )
@@ -98,6 +103,17 @@ if(Qt6Test_FOUND AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests")
     target_include_directories(tst_ImageProcessorCore PRIVATE include)
     target_link_libraries(tst_ImageProcessorCore PRIVATE Qt6::Core Qt6::Test)
     add_test(NAME tst_ImageProcessorCore COMMAND tst_ImageProcessorCore)
+
+    qt_add_executable(tst_OpenCvImageBridge
+        tests/tst_OpenCvImageBridge.cpp
+        include/OpenCvImageBridge.h
+        src/OpenCvImageBridge.cpp
+        include/ImageBuffer.h
+    )
+    target_include_directories(tst_OpenCvImageBridge PRIVATE include)
+    target_include_directories(tst_OpenCvImageBridge PRIVATE ${OpenCV_INCLUDE_DIRS})
+    target_link_libraries(tst_OpenCvImageBridge PRIVATE Qt6::Core Qt6::Test ${OpenCV_LIBS})
+    add_test(NAME tst_OpenCvImageBridge COMMAND tst_OpenCvImageBridge)
 
     qt_add_executable(tst_ImageIoService
         tests/tst_ImageIoService.cpp
@@ -124,12 +140,15 @@ if(Qt6Test_FOUND AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests")
         src/ProcessingController.cpp
         include/ImageProcessorCore.h
         src/ImageProcessorCore.cpp
+        include/OpenCvImageBridge.h
+        src/OpenCvImageBridge.cpp
         include/GpuEffectPipeline.h
         src/GpuEffectPipeline.cpp
     )
     target_include_directories(tst_ProcessingController PRIVATE include)
     target_include_directories(tst_ProcessingController PRIVATE "${FFMPEG_PREFIX}/include")
-    target_link_libraries(tst_ProcessingController PRIVATE Qt6::Core Qt6::Gui Qt6::Qml Qt6::OpenGL Qt6::Test ${AVFORMAT_LIB} ${AVCODEC_LIB} ${AVUTIL_LIB} ${SWSCALE_LIB} x264_compat)
+    target_include_directories(tst_ProcessingController PRIVATE ${OpenCV_INCLUDE_DIRS})
+    target_link_libraries(tst_ProcessingController PRIVATE Qt6::Core Qt6::Gui Qt6::Qml Qt6::OpenGL Qt6::Test ${OpenCV_LIBS} ${AVFORMAT_LIB} ${AVCODEC_LIB} ${AVUTIL_LIB} ${SWSCALE_LIB} x264_compat)
     set_target_properties(tst_ProcessingController PROPERTIES
         BUILD_RPATH "${FFMPEG_PREFIX}/lib;${CMAKE_BINARY_DIR}"
         LINK_FLAGS "-Wl,-rpath-link,${FFMPEG_PREFIX}/lib,--allow-shlib-undefined"
