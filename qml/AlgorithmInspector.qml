@@ -16,18 +16,21 @@ Rectangle {
 
         Rectangle {
             Layout.fillWidth: true
-            height: 40
+            Layout.preferredHeight: categoryTabs.implicitHeight + 12
             color: "#F8F8F5"
             border.color: "#E5E8EB"
             border.width: 1
 
-            Row {
+            Flow {
+                id: categoryTabs
                 anchors {
-                    fill: parent
                     leftMargin: 8
                     rightMargin: 8
                     topMargin: 6
                     bottomMargin: 6
+                    left: parent.left
+                    right: parent.right
+                    top: parent.top
                 }
                 spacing: 4
 
@@ -35,8 +38,8 @@ Rectangle {
                     model: ["Point", "Geometry", "Filter", "Edge", "Morphology", "Grayscale"]
 
                     delegate: Rectangle {
-                        width: tabLabel.implicitWidth + 12
-                        height: 28
+                        width: Math.max(44, tabLabel.implicitWidth + 10)
+                        height: 26
                         radius: 4
                         color: ProcessingController.algorithmModel.category === modelData ? "#6F86AB" : "#FFFFFF"
                         border.color: ProcessingController.algorithmModel.category === modelData ? "transparent" : "#E5E8EB"
@@ -46,7 +49,7 @@ Rectangle {
                             id: tabLabel
                             anchors.centerIn: parent
                             text: modelData
-                            font.pixelSize: 12
+                            font.pixelSize: 11
                             color: ProcessingController.algorithmModel.category === modelData ? "#FFFFFF" : "#2F3438"
                         }
 
