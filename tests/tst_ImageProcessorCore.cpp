@@ -67,6 +67,8 @@ private slots:
     void testEmboss();
     void testHorizontalEdgeSobelGy();
     void testVerticalEdgeSobelGx();
+    void testOpenCvEdgeFiltersPreserveAlphaAndClearsTransparentRgb();
+    void testRotateThenEdgeKeepsTransparentBackground();
     void testHistogramStretch();
     void testEndpointDetectionOutOfBoundsIsBackground();
     void testBlur3x3BoundaryClampToEdge();
@@ -525,6 +527,52 @@ void TestImageProcessorCore::testVerticalEdgeSobelGx() {
     QCOMPARE(getPx(dst,2,2,0), (uint8_t)0);
     // Output is grayscale
     QCOMPARE(getPx(dst,2,2,0), getPx(dst,2,2,1));
+}
+
+void TestImageProcessorCore::testOpenCvEdgeFiltersPreserveAlphaAndClearsTransparentRgb() {
+    const int algorithmIds[] = {19, 20, 21, 22, 24};
+
+    for (int algorithmId : algorithmIds) {
+        auto src = makeRgbaImage();
+        ImageBuffer dst;
+        EffectParams p;
+        if (algorithmId == 19 || algorithmId == 20) {
+            p["scale"] = 1.0;
+        } else if (algorithmId == 22) {
+            p["sigma1"] = 1.0;
+            p["sigma2"] = 2.0;
+            p["gain"] = 1.0;
+        } else if (algorithmId == 24) {
+            p["threshold"] = 20;
+        }
+
+        QVERIFY2(ImageProcessorCore::apply(src, dst, algorithmId, p),
+                 "algorithm failed");
+        QCOMPARE(dst.channels, 4);
+        QCOMPARE(getPx(dst, 0, 0, 0), (uint8_t)0);
+        QCOMPARE(getPx(dst, 0, 0, 1), (uint8_t)0);
+        QCOMPARE(getPx(dst, 0, 0, 2), (uint8_t)0);
+        QCOMPARE(getPx(dst, 0, 0, 3), (uint8_t)0);
+        QCOMPARE(getPx(dst, 1, 0, 3), (uint8_t)128);
+    }
+}
+
+void TestImageProcessorCore::testRotateThenEdgeKeepsTransparentBackground() {
+    auto src = makeImage(20, 20, 120, 80, 40);
+
+    ImageBuffer rotated;
+    EffectParams rotateParams;
+    rotateParams["degree"] = 45.0;
+    ImageProcessorCore::apply(src, rotated, 8, rotateParams);
+
+    ImageBuffer edged;
+    ImageProcessorCore::apply(rotated, edged, 21, EffectParams{});
+
+    QCOMPARE(edged.channels, 4);
+    QCOMPARE(getPx(edged, 0, 0, 0), (uint8_t)0);
+    QCOMPARE(getPx(edged, 0, 0, 1), (uint8_t)0);
+    QCOMPARE(getPx(edged, 0, 0, 2), (uint8_t)0);
+    QCOMPARE(getPx(edged, 0, 0, 3), (uint8_t)0);
 }
 
 void TestImageProcessorCore::testHistogramStretch() {

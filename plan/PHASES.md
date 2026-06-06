@@ -61,7 +61,8 @@ Suggested order:
 2. Flip and rotate geometry. Implemented for IDs `7` and `8`.
 3. Blur, sharpen, smoothing, and morphology. Implemented for IDs `9`, `11`,
    `12`, `13`, `14`, `15`, `16`, `17`, `18`, and `25`.
-4. Edge and frequency-like filters.
+4. Edge and frequency-like filters. Implemented for IDs `19`, `20`, `21`,
+   `22`, and `24`.
 5. Statistics-dependent algorithms.
 
 Exit criteria:
@@ -82,6 +83,10 @@ Implementation note:
   OpenCV CPU paths over RGB channels with alpha preserved from the input.
 - Filter border handling uses OpenCV replicate borders to match the prior
   clamped-edge sampling contract.
+- Sobel edge, Laplacian, DoG, and endpoint detection use OpenCV CPU paths while
+  preserving the same alpha policy as other non-geometry filters.
+- Endpoint detection keeps out-of-image neighbors as background by padding the
+  foreground mask with a constant zero border before counting neighbors.
 - Statistics-dependent IDs `5`, `10`, and `23` remain on the legacy loop path
   until the statistics contract is migrated.
 

@@ -171,3 +171,20 @@ Consequence: geometry remains the only current CPU path that intentionally
 changes channel count and alpha shape. Non-geometry filters must use replicate
 borders for legacy clamped-edge parity and must rely on final transparent-RGB
 cleanup before returning.
+
+## D-013: Edge And Endpoint Operations Preserve The Filter Alpha Contract
+
+Status: verified
+
+Decision: OpenCV-backed Sobel edge, Laplacian, DoG, and endpoint detection keep
+alpha outside the OpenCV calculation and write only RGB output back into the
+destination.
+
+Reason: post-rotate stacks can feed transparent RGBA pixels into edge
+algorithms. Running edge or frequency operations over alpha would create new
+opaque or color-bearing border artifacts that did not exist in the legacy CPU
+path.
+
+Consequence: Sobel and Laplacian use replicate borders for clamped-edge parity,
+DoG uses RGB Gaussian blur output as its OpenCV source, and endpoint detection
+uses a zero-padded foreground mask so out-of-image neighbors remain background.

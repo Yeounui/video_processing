@@ -64,50 +64,6 @@ inline void clearTransparentRgb(ImageBuffer& img) {
     }
 }
 
-// 1D Gaussian kernel (normalized), size must be odd
-static std::vector<double> makeGaussian1D(int size, double sigma) {
-    std::vector<double> k(size);
-    int half = size / 2;
-    double sum = 0.0;
-    for (int i = 0; i < size; ++i) {
-        double x = i - half;
-        k[i] = std::exp(-x * x / (2.0 * sigma * sigma));
-        sum += k[i];
-    }
-    for (auto& v : k) v /= sum;
-    return k;
-}
-
-// Separable Gaussian blur: horizontal then vertical pass into dst
-static void gaussianBlur(const ImageBuffer& src, ImageBuffer& dst, int kernelSize, double sigma) {
-    resizeDst(src, dst);
-    auto k = makeGaussian1D(kernelSize, sigma);
-    int half = kernelSize / 2;
-    int W = src.width, H = src.height;
-
-    // Horizontal pass: src → tmp
-    ImageBuffer tmp;
-    resizeDst(src, tmp);
-    for (int y = 0; y < H; ++y)
-        for (int x = 0; x < W; ++x)
-            for (int c = 0; c < 3; ++c) {
-                double acc = 0.0;
-                for (int ki = 0; ki < kernelSize; ++ki)
-                    acc += k[ki] * px(src, x + ki - half, y, c);
-                setPx(tmp, x, y, c, clamp8(acc));
-            }
-
-    // Vertical pass: tmp → dst
-    for (int y = 0; y < H; ++y)
-        for (int x = 0; x < W; ++x)
-            for (int c = 0; c < 3; ++c) {
-                double acc = 0.0;
-                for (int ki = 0; ki < kernelSize; ++ki)
-                    acc += k[ki] * px(tmp, x, y + ki - half, c);
-                setPx(dst, x, y, c, clamp8(acc));
-            }
-}
-
 static cv::Mat rgbChannelsMat(const ImageBuffer& src) {
     const cv::Mat srcView = OpenCvImageBridge::constMatView(src);
     if (srcView.empty())
@@ -621,46 +577,47 @@ bool ImageProcessorCore::apply(const ImageBuffer& src, ImageBuffer& dst,
     }
     case 19: { // Horizontal Edge (Sobel Gy)
         double scale = params.value("scale", 1.0).toDouble();
-        for (int y = 0; y < H; ++y)
-            for (int x = 0; x < W; ++x) {
-                double gy = -lum(px(src, x - 1, y - 1, 0), px(src, x - 1, y - 1, 1), px(src, x - 1, y - 1, 2))
-                          - 2.0 * lum(px(src, x, y - 1, 0), px(src, x, y - 1, 1), px(src, x, y - 1, 2))
-                          - lum(px(src, x + 1, y - 1, 0), px(src, x + 1, y - 1, 1), px(src, x + 1, y - 1, 2))
-                          + lum(px(src, x - 1, y + 1, 0), px(src, x - 1, y + 1, 1), px(src, x - 1, y + 1, 2))
-                          + 2.0 * lum(px(src, x, y + 1, 0), px(src, x, y + 1, 1), px(src, x, y + 1, 2))
-                          + lum(px(src, x + 1, y + 1, 0), px(src, x + 1, y + 1, 1), px(src, x + 1, y + 1, 2));
-                uint8_t edge = clamp8(std::abs(gy) * scale);
-                setPx(dst, x, y, 0, edge);
-                setPx(dst, x, y, 1, edge);
-                setPx(dst, x, y, 2, edge);
-            }
+        const cv::Mat rgb = rgbChannelsMat(src);
+        if (rgb.empty())
+            break;
+        const cv::Mat kernel = (cv::Mat_<double>(3, 3) <<
+            -1.0, -2.0, -1.0,
+             0.0,  0.0,  0.0,
+             1.0,  2.0,  1.0);
+        cv::Mat edge64;
+        cv::filter2D(luminanceMat(rgb), edge64, CV_64F, kernel, cv::Point(-1, -1), 0.0,
+                     cv::BORDER_REPLICATE);
+        cv::Mat edge;
+        cv::Mat(cv::abs(edge64) * scale).convertTo(edge, CV_8U);
+        writeRgbChannels(mergeGrayToRgb(edge), dst);
         break;
     }
     case 20: { // Vertical Edge (Sobel Gx)
         double scale = params.value("scale", 1.0).toDouble();
-        for (int y = 0; y < H; ++y)
-            for (int x = 0; x < W; ++x) {
-                double gx = -lum(px(src, x - 1, y - 1, 0), px(src, x - 1, y - 1, 1), px(src, x - 1, y - 1, 2))
-                          + lum(px(src, x + 1, y - 1, 0), px(src, x + 1, y - 1, 1), px(src, x + 1, y - 1, 2))
-                          - 2.0 * lum(px(src, x - 1, y, 0), px(src, x - 1, y, 1), px(src, x - 1, y, 2))
-                          + 2.0 * lum(px(src, x + 1, y, 0), px(src, x + 1, y, 1), px(src, x + 1, y, 2))
-                          - lum(px(src, x - 1, y + 1, 0), px(src, x - 1, y + 1, 1), px(src, x - 1, y + 1, 2))
-                          + lum(px(src, x + 1, y + 1, 0), px(src, x + 1, y + 1, 1), px(src, x + 1, y + 1, 2));
-                uint8_t edge = clamp8(std::abs(gx) * scale);
-                setPx(dst, x, y, 0, edge);
-                setPx(dst, x, y, 1, edge);
-                setPx(dst, x, y, 2, edge);
-            }
+        const cv::Mat rgb = rgbChannelsMat(src);
+        if (rgb.empty())
+            break;
+        const cv::Mat kernel = (cv::Mat_<double>(3, 3) <<
+            -1.0, 0.0, 1.0,
+            -2.0, 0.0, 2.0,
+            -1.0, 0.0, 1.0);
+        cv::Mat edge64;
+        cv::filter2D(luminanceMat(rgb), edge64, CV_64F, kernel, cv::Point(-1, -1), 0.0,
+                     cv::BORDER_REPLICATE);
+        cv::Mat edge;
+        cv::Mat(cv::abs(edge64) * scale).convertTo(edge, CV_8U);
+        writeRgbChannels(mergeGrayToRgb(edge), dst);
         break;
     }
     case 21: { // Laplacian
-        for (int y = 0; y < H; ++y)
-            for (int x = 0; x < W; ++x)
-                for (int c = 0; c < 3; ++c) {
-                    double v = -px(src, x, y - 1, c) - px(src, x - 1, y, c) + 4.0 * px(src, x, y, c)
-                             - px(src, x + 1, y, c) - px(src, x, y + 1, c) + 128.0;
-                    setPx(dst, x, y, c, clamp8(v));
-                }
+        const cv::Mat rgb = rgbChannelsMat(src);
+        if (rgb.empty())
+            break;
+        const cv::Mat kernel = (cv::Mat_<double>(3, 3) <<
+             0.0, -1.0,  0.0,
+            -1.0,  4.0, -1.0,
+             0.0, -1.0,  0.0);
+        writeRgbChannels(filterRgb(rgb, kernel, 128.0), dst);
         break;
     }
     case 22: { // DoG
@@ -672,15 +629,16 @@ bool ImageProcessorCore::apply(const ImageBuffer& src, ImageBuffer& dst,
             if (k % 2 == 0) k++;
             return k;
         };
-        ImageBuffer blur1, blur2;
-        gaussianBlur(src, blur1, kernelSize(sigma1), sigma1);
-        gaussianBlur(src, blur2, kernelSize(sigma2), sigma2);
-        for (int y = 0; y < H; ++y)
-            for (int x = 0; x < W; ++x)
-                for (int c = 0; c < 3; ++c) {
-                    double v = gain * (px(blur1, x, y, c) - px(blur2, x, y, c)) + 128.0;
-                    setPx(dst, x, y, c, clamp8(v));
-                }
+        const cv::Mat rgb = rgbChannelsMat(src);
+        if (rgb.empty())
+            break;
+        cv::Mat blur164, blur264, dog64;
+        gaussianBlurRgb(rgb, kernelSize(sigma1), sigma1).convertTo(blur164, CV_64F);
+        gaussianBlurRgb(rgb, kernelSize(sigma2), sigma2).convertTo(blur264, CV_64F);
+        cv::addWeighted(blur164, gain, blur264, -gain, 128.0, dog64);
+        cv::Mat dog;
+        dog64.convertTo(dog, CV_8U);
+        writeRgbChannels(dog, dst);
         break;
     }
     case 23: { // Histogram Stretch
@@ -703,29 +661,32 @@ bool ImageProcessorCore::apply(const ImageBuffer& src, ImageBuffer& dst,
     }
     case 24: { // Endpoint Detection
         int threshold = params.value("threshold", 127).toInt();
-        auto foreground = [&](int x, int y) {
-            if (x < 0 || x >= W || y < 0 || y >= H) return false;
-            return lum(px(src, x, y, 0), px(src, x, y, 1), px(src, x, y, 2)) >= threshold;
-        };
-        for (int y = 0; y < H; ++y)
-            for (int x = 0; x < W; ++x) {
-                if (!foreground(x, y)) {
-                    setPx(dst, x, y, 0, 0);
-                    setPx(dst, x, y, 1, 0);
-                    setPx(dst, x, y, 2, 0);
-                } else {
-                    int count = 0;
-                    for (int dy = -1; dy <= 1; ++dy)
-                        for (int dx = -1; dx <= 1; ++dx) {
-                            if (dx == 0 && dy == 0) continue;
-                            if (foreground(x + dx, y + dy)) count++;
-                        }
-                    uint8_t v = (count == 1) ? 255 : 0;
-                    setPx(dst, x, y, 0, v);
-                    setPx(dst, x, y, 1, v);
-                    setPx(dst, x, y, 2, v);
-                }
+        const cv::Mat rgb = rgbChannelsMat(src);
+        if (rgb.empty())
+            break;
+        cv::Mat foregroundMask;
+        cv::compare(luminanceMat(rgb), threshold, foregroundMask, cv::CMP_GE);
+
+        cv::Mat foreground01;
+        foregroundMask.convertTo(foreground01, CV_8U, 1.0 / 255.0);
+        cv::Mat padded;
+        cv::copyMakeBorder(foreground01, padded, 1, 1, 1, 1, cv::BORDER_CONSTANT, cv::Scalar(0));
+
+        cv::Mat neighborCount = cv::Mat::zeros(foreground01.size(), CV_16U);
+        for (int dy = 0; dy < 3; ++dy)
+            for (int dx = 0; dx < 3; ++dx) {
+                if (dx == 1 && dy == 1)
+                    continue;
+                cv::Mat shifted16;
+                padded(cv::Rect(dx, dy, W, H)).convertTo(shifted16, CV_16U);
+                cv::add(neighborCount, shifted16, neighborCount, cv::noArray(), CV_16U);
             }
+
+        cv::Mat singleNeighborMask;
+        cv::compare(neighborCount, 1, singleNeighborMask, cv::CMP_EQ);
+        cv::Mat endpoints;
+        cv::bitwise_and(singleNeighborMask, foregroundMask, endpoints);
+        writeRgbChannels(mergeGrayToRgb(endpoints), dst);
         break;
     }
     case 25: { // Median Smoothing

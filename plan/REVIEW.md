@@ -69,8 +69,9 @@ Current automated coverage:
 - `tst_ImageProcessorCore` covers RGB rotate output as RGBA, transparent
   rotate borders, alpha-content rotate bounds, repeated rotate bounds, OpenCV
   flip alpha preservation, `Rotate -> Brightness` transparent-background
-  cleanup, OpenCV filter alpha preservation, and `Rotate -> Blur`
-  transparent-background cleanup.
+  cleanup, OpenCV filter alpha preservation, `Rotate -> Blur`
+  transparent-background cleanup, OpenCV edge/DoG/endpoint alpha preservation,
+  and `Rotate -> Edge` transparent-background cleanup.
 
 ## Video And Stream Acceptance
 
