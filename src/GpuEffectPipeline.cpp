@@ -4,18 +4,26 @@
 
 namespace {
 
-class ScopedFramebufferViewportRestore {
+class ScopedGpuEffectState {
 public:
-    explicit ScopedFramebufferViewportRestore(QOpenGLFunctions_3_3_Core &gl)
+    explicit ScopedGpuEffectState(QOpenGLFunctions_3_3_Core &gl)
         : gl_(gl)
     {
         gl_.glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &drawFramebuffer_);
         gl_.glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &readFramebuffer_);
         gl_.glGetIntegerv(GL_VIEWPORT, viewport_);
+        gl_.glGetFloatv(GL_COLOR_CLEAR_VALUE, clearColor_);
+        blendEnabled_ = gl_.glIsEnabled(GL_BLEND);
+        gl_.glDisable(GL_BLEND);
     }
 
-    ~ScopedFramebufferViewportRestore()
+    ~ScopedGpuEffectState()
     {
+        if (blendEnabled_)
+            gl_.glEnable(GL_BLEND);
+        else
+            gl_.glDisable(GL_BLEND);
+        gl_.glClearColor(clearColor_[0], clearColor_[1], clearColor_[2], clearColor_[3]);
         gl_.glBindFramebuffer(GL_DRAW_FRAMEBUFFER, static_cast<GLuint>(drawFramebuffer_));
         gl_.glBindFramebuffer(GL_READ_FRAMEBUFFER, static_cast<GLuint>(readFramebuffer_));
         gl_.glViewport(viewport_[0], viewport_[1], viewport_[2], viewport_[3]);
@@ -26,6 +34,8 @@ private:
     GLint drawFramebuffer_ = 0;
     GLint readFramebuffer_ = 0;
     GLint viewport_[4] = {0, 0, 0, 0};
+    GLfloat clearColor_[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+    GLboolean blendEnabled_ = GL_FALSE;
 };
 
 } // namespace
@@ -415,7 +425,7 @@ std::shared_ptr<ImageBuffer> GpuEffectPipeline::applyStaticEffect(
         return nullptr;
     }
 
-    ScopedFramebufferViewportRestore restore(gl_);
+    ScopedGpuEffectState restore(gl_);
 
     if (!ensureTextures(src.width, src.height)) {
         qWarning() << "GpuEffectPipeline: Failed to ensure textures";
