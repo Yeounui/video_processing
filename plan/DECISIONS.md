@@ -152,3 +152,22 @@ rotate.
 Consequence: later color, grayscale, blur, sharpen, and morphology operations
 must continue to treat `alpha == 0` pixels as protected background and clear RGB
 after processing.
+
+## D-012: Filter Operations Preserve Alpha While Processing RGB
+
+Status: verified
+
+Decision: OpenCV-backed emboss, blur, Gaussian blur, sharpen, high-pass
+sharpen, high-boost, motion blur, and median smoothing operate on RGB channels
+only, then write those channels back into the destination buffer while keeping
+the copied source alpha.
+
+Reason: the legacy CPU filters did not filter alpha, and post-rotate stacks
+depend on transparent pixels remaining transparent after additional algorithms.
+Filtering RGBA directly would let convolution or median operations modify alpha
+near transparent borders.
+
+Consequence: geometry remains the only current CPU path that intentionally
+changes channel count and alpha shape. Non-geometry filters must use replicate
+borders for legacy clamped-edge parity and must rely on final transparent-RGB
+cleanup before returning.

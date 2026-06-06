@@ -54,6 +54,8 @@ private slots:
     void testRotateRepeatedDoesNotShrink();
     void testRotateOutputIsAlways4Channel();
     void testBlur3x3Uniform();
+    void testOpenCvFiltersPreserveAlphaAndClearsTransparentRgb();
+    void testRotateThenBlurKeepsTransparentBackground();
     void testGrayscaleAverage();
     void testGrayscaleLuminosity();
     void testGrayscaleLightness();
@@ -366,6 +368,49 @@ void TestImageProcessorCore::testBlur3x3Uniform() {
     ImageBuffer dst;
     ImageProcessorCore::apply(src, dst, 11, EffectParams{});
     QCOMPARE(getPx(dst, 2, 2, 0), (uint8_t)128);
+}
+
+void TestImageProcessorCore::testOpenCvFiltersPreserveAlphaAndClearsTransparentRgb() {
+    const int algorithmIds[] = {9, 11, 12, 13, 14, 15, 16, 17, 18, 25};
+
+    for (int algorithmId : algorithmIds) {
+        auto src = makeRgbaImage();
+        ImageBuffer dst;
+        EffectParams p;
+        if (algorithmId == 13) {
+            p["kernel"] = "3";
+            p["sigma"] = 1.0;
+        } else if (algorithmId == 17 || algorithmId == 18) {
+            p["distance"] = 3;
+        }
+
+        QVERIFY2(ImageProcessorCore::apply(src, dst, algorithmId, p),
+                 "algorithm failed");
+        QCOMPARE(dst.channels, 4);
+        QCOMPARE(getPx(dst, 0, 0, 0), (uint8_t)0);
+        QCOMPARE(getPx(dst, 0, 0, 1), (uint8_t)0);
+        QCOMPARE(getPx(dst, 0, 0, 2), (uint8_t)0);
+        QCOMPARE(getPx(dst, 0, 0, 3), (uint8_t)0);
+        QCOMPARE(getPx(dst, 1, 0, 3), (uint8_t)128);
+    }
+}
+
+void TestImageProcessorCore::testRotateThenBlurKeepsTransparentBackground() {
+    auto src = makeImage(20, 20, 120, 80, 40);
+
+    ImageBuffer rotated;
+    EffectParams rotateParams;
+    rotateParams["degree"] = 45.0;
+    ImageProcessorCore::apply(src, rotated, 8, rotateParams);
+
+    ImageBuffer blurred;
+    ImageProcessorCore::apply(rotated, blurred, 11, EffectParams{});
+
+    QCOMPARE(blurred.channels, 4);
+    QCOMPARE(getPx(blurred, 0, 0, 0), (uint8_t)0);
+    QCOMPARE(getPx(blurred, 0, 0, 1), (uint8_t)0);
+    QCOMPARE(getPx(blurred, 0, 0, 2), (uint8_t)0);
+    QCOMPARE(getPx(blurred, 0, 0, 3), (uint8_t)0);
 }
 
 void TestImageProcessorCore::testGrayscaleAverage() {

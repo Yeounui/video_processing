@@ -26,10 +26,14 @@ requirements.
 
 - Phase 1 is verified with an `ImageBuffer` / `cv::Mat` bridge.
 - Phase 2 CPU migration has started in `ImageProcessorCore`.
-- Algorithm IDs `1`, `2`, `3`, `4`, `6`, `7`, `8`, `26`, `27`, and `28`
+- Algorithm IDs `1`, `2`, `3`, `4`, `6`, `7`, `8`, `9`, `11`, `12`,
+  `13`, `14`, `15`, `16`, `17`, `18`, `25`, `26`, `27`, and `28`
   currently use OpenCV-backed CPU paths.
 - Rotate remains geometry-materializing, always outputs RGBA, and keeps
   transparent borders `(0, 0, 0, 0)` for later stack operations.
+- Blur, sharpen, motion blur, emboss, and median smoothing process RGB only,
+  preserve source alpha, and clear RGB for fully transparent pixels after the
+  operation.
 - The current public image boundary is `ImageBuffer`.
 - OpenCV 4.13.0 is found in the `videoprocess` Conda environment for `core`
   and `imgproc`.
@@ -48,6 +52,9 @@ requirements.
   `tst_ProcessingController`.
 - 2026-06-06: `git diff --check` and `git diff --cached --check` passed for
   the CPU point/grayscale and geometry migration commits.
+- 2026-06-06: `cmake --build build` and
+  `ctest --test-dir build --output-on-failure` passed after migrating CPU
+  blur, sharpen, emboss, motion blur, and median smoothing paths to OpenCV.
 
 ## Source Evidence
 

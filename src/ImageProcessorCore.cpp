@@ -64,19 +64,6 @@ inline void clearTransparentRgb(ImageBuffer& img) {
     }
 }
 
-inline uint8_t median9(uint8_t vals[9]) {
-    for (int i = 1; i < 9; ++i) {
-        uint8_t key = vals[i];
-        int j = i - 1;
-        while (j >= 0 && vals[j] > key) {
-            vals[j + 1] = vals[j];
-            --j;
-        }
-        vals[j + 1] = key;
-    }
-    return vals[4];
-}
-
 // 1D Gaussian kernel (normalized), size must be odd
 static std::vector<double> makeGaussian1D(int size, double sigma) {
     std::vector<double> k(size);
@@ -173,6 +160,23 @@ static cv::Mat mergeGrayToRgb(const cv::Mat& gray) {
     cv::Mat rgb;
     cv::merge(std::vector<cv::Mat>{gray, gray, gray}, rgb);
     return rgb;
+}
+
+static cv::Mat filterRgb(const cv::Mat& rgb, const cv::Mat& kernel, double delta = 0.0) {
+    cv::Mat filtered64;
+    cv::filter2D(rgb, filtered64, CV_64F, kernel, cv::Point(-1, -1), delta,
+                 cv::BORDER_REPLICATE);
+
+    cv::Mat filtered;
+    filtered64.convertTo(filtered, CV_8U);
+    return filtered;
+}
+
+static cv::Mat gaussianBlurRgb(const cv::Mat& rgb, int kernelSize, double sigma) {
+    cv::Mat blurred;
+    cv::GaussianBlur(rgb, blurred, cv::Size(kernelSize, kernelSize), sigma, sigma,
+                     cv::BORDER_REPLICATE);
+    return blurred;
 }
 
 static cv::Mat rgbaGeometryMat(const ImageBuffer& src) {
@@ -481,12 +485,14 @@ bool ImageProcessorCore::apply(const ImageBuffer& src, ImageBuffer& dst,
         break;
     }
     case 9: { // Emboss
-        for (int y = 0; y < H; ++y)
-            for (int x = 0; x < W; ++x)
-                for (int c = 0; c < 3; ++c) {
-                    double v = px(src, x + 1, y + 1, c) - px(src, x - 1, y - 1, c) + 128.0;
-                    setPx(dst, x, y, c, clamp8(v));
-                }
+        const cv::Mat rgb = rgbChannelsMat(src);
+        if (rgb.empty())
+            break;
+        const cv::Mat kernel = (cv::Mat_<double>(3, 3) <<
+            -1.0, 0.0, 0.0,
+             0.0, 0.0, 0.0,
+             0.0, 0.0, 1.0);
+        writeRgbChannels(filterRgb(rgb, kernel, 128.0), dst);
         break;
     }
     case 10: { // Contrast Stretch
@@ -510,104 +516,107 @@ bool ImageProcessorCore::apply(const ImageBuffer& src, ImageBuffer& dst,
         break;
     }
     case 11: { // 3x3 Blur
-        for (int y = 0; y < H; ++y)
-            for (int x = 0; x < W; ++x)
-                for (int c = 0; c < 3; ++c) {
-                    double acc = 0.0;
-                    for (int dy = -1; dy <= 1; ++dy)
-                        for (int dx = -1; dx <= 1; ++dx)
-                            acc += px(src, x + dx, y + dy, c);
-                    setPx(dst, x, y, c, clamp8(acc / 9.0));
-                }
+        const cv::Mat rgb = rgbChannelsMat(src);
+        if (rgb.empty())
+            break;
+        cv::Mat blurred;
+        cv::blur(rgb, blurred, cv::Size(3, 3), cv::Point(-1, -1),
+                 cv::BORDER_REPLICATE);
+        writeRgbChannels(blurred, dst);
         break;
     }
     case 12: { // 5x5 Blur
-        for (int y = 0; y < H; ++y)
-            for (int x = 0; x < W; ++x)
-                for (int c = 0; c < 3; ++c) {
-                    double acc = 0.0;
-                    for (int dy = -2; dy <= 2; ++dy)
-                        for (int dx = -2; dx <= 2; ++dx)
-                            acc += px(src, x + dx, y + dy, c);
-                    setPx(dst, x, y, c, clamp8(acc / 25.0));
-                }
+        const cv::Mat rgb = rgbChannelsMat(src);
+        if (rgb.empty())
+            break;
+        cv::Mat blurred;
+        cv::blur(rgb, blurred, cv::Size(5, 5), cv::Point(-1, -1),
+                 cv::BORDER_REPLICATE);
+        writeRgbChannels(blurred, dst);
         break;
     }
     case 13: { // Gaussian Blur
         int kernelSize = params.value("kernel", "5").toString().toInt();
         if (kernelSize != 3 && kernelSize != 5 && kernelSize != 7) kernelSize = 5;
         double sigma = params.value("sigma", 1.0).toDouble();
-        gaussianBlur(src, dst, kernelSize, sigma);
+        const cv::Mat rgb = rgbChannelsMat(src);
+        if (rgb.empty())
+            break;
+        writeRgbChannels(gaussianBlurRgb(rgb, kernelSize, sigma), dst);
         break;
     }
     case 14: { // Sharpen (Unsharp Mask)
         double alpha = params.value("alpha", 1.0).toDouble();
-        ImageBuffer blurred;
-        gaussianBlur(src, blurred, 5, 1.0);
-        for (int y = 0; y < H; ++y)
-            for (int x = 0; x < W; ++x)
-                for (int c = 0; c < 3; ++c) {
-                    double v = px(src, x, y, c) + alpha * (px(src, x, y, c) - px(blurred, x, y, c));
-                    setPx(dst, x, y, c, clamp8(v));
-                }
+        const cv::Mat rgb = rgbChannelsMat(src);
+        if (rgb.empty())
+            break;
+        cv::Mat rgb64, blurred64, sharpened64;
+        rgb.convertTo(rgb64, CV_64F);
+        gaussianBlurRgb(rgb, 5, 1.0).convertTo(blurred64, CV_64F);
+        cv::addWeighted(rgb64, 1.0 + alpha, blurred64, -alpha, 0.0,
+                        sharpened64);
+        cv::Mat sharpened;
+        sharpened64.convertTo(sharpened, CV_8U);
+        writeRgbChannels(sharpened, dst);
         break;
     }
     case 15: { // High-Pass Sharpen
         double strength = params.value("strength", 1.0).toDouble();
-        // Store signed raw high-pass values in double buffer (avoids UB from uint8_t scratch)
-        std::vector<double> detail(W * H * 3);
-        for (int y = 0; y < H; ++y)
-            for (int x = 0; x < W; ++x)
-                for (int c = 0; c < 3; ++c) {
-                    double acc = -px(src, x - 1, y - 1, c) - px(src, x, y - 1, c) - px(src, x + 1, y - 1, c)
-                                - px(src, x - 1, y, c) + 8.0 * px(src, x, y, c) - px(src, x + 1, y, c)
-                                - px(src, x - 1, y + 1, c) - px(src, x, y + 1, c) - px(src, x + 1, y + 1, c);
-                    detail[(y * W + x) * 3 + c] = acc;
-                }
-        for (int y = 0; y < H; ++y)
-            for (int x = 0; x < W; ++x)
-                for (int c = 0; c < 3; ++c) {
-                    double v = px(src, x, y, c) + strength * detail[(y * W + x) * 3 + c];
-                    setPx(dst, x, y, c, clamp8(v));
-                }
+        const cv::Mat rgb = rgbChannelsMat(src);
+        if (rgb.empty())
+            break;
+        const cv::Mat kernel = (cv::Mat_<double>(3, 3) <<
+            -1.0, -1.0, -1.0,
+            -1.0,  8.0, -1.0,
+            -1.0, -1.0, -1.0);
+        cv::Mat detail64;
+        cv::filter2D(rgb, detail64, CV_64F, kernel, cv::Point(-1, -1), 0.0,
+                     cv::BORDER_REPLICATE);
+
+        cv::Mat rgb64, sharpened64;
+        rgb.convertTo(rgb64, CV_64F);
+        cv::addWeighted(rgb64, 1.0, detail64, strength, 0.0, sharpened64);
+        cv::Mat sharpened;
+        sharpened64.convertTo(sharpened, CV_8U);
+        writeRgbChannels(sharpened, dst);
         break;
     }
     case 16: { // High-Boost
         double beta = params.value("beta", 1.0).toDouble();
-        ImageBuffer blurred;
-        gaussianBlur(src, blurred, 5, 1.0);
-        for (int y = 0; y < H; ++y)
-            for (int x = 0; x < W; ++x)
-                for (int c = 0; c < 3; ++c) {
-                    double v = (1.0 + beta) * px(src, x, y, c) - px(blurred, x, y, c);
-                    setPx(dst, x, y, c, clamp8(v));
-                }
+        const cv::Mat rgb = rgbChannelsMat(src);
+        if (rgb.empty())
+            break;
+        cv::Mat rgb64, blurred64, boosted64;
+        rgb.convertTo(rgb64, CV_64F);
+        gaussianBlurRgb(rgb, 5, 1.0).convertTo(blurred64, CV_64F);
+        cv::addWeighted(rgb64, 1.0 + beta, blurred64, -1.0, 0.0, boosted64);
+        cv::Mat boosted;
+        boosted64.convertTo(boosted, CV_8U);
+        writeRgbChannels(boosted, dst);
         break;
     }
     case 17: { // Diagonal Motion Blur
         int distance = params.value("distance", 9).toInt();
-        int half = distance / 2;
-        for (int y = 0; y < H; ++y)
-            for (int x = 0; x < W; ++x)
-                for (int c = 0; c < 3; ++c) {
-                    double acc = 0.0;
-                    for (int i = 0; i < distance; ++i)
-                        acc += px(src, x + i - half, y + i - half, c);
-                    setPx(dst, x, y, c, clamp8(acc / distance));
-                }
+        if (distance < 1)
+            distance = 1;
+        const cv::Mat rgb = rgbChannelsMat(src);
+        if (rgb.empty())
+            break;
+        cv::Mat kernel = cv::Mat::zeros(distance, distance, CV_64F);
+        for (int i = 0; i < distance; ++i)
+            kernel.at<double>(i, i) = 1.0 / distance;
+        writeRgbChannels(filterRgb(rgb, kernel), dst);
         break;
     }
     case 18: { // Horizontal Motion Blur
         int distance = params.value("distance", 9).toInt();
-        int half = distance / 2;
-        for (int y = 0; y < H; ++y)
-            for (int x = 0; x < W; ++x)
-                for (int c = 0; c < 3; ++c) {
-                    double acc = 0.0;
-                    for (int i = 0; i < distance; ++i)
-                        acc += px(src, x + i - half, y, c);
-                    setPx(dst, x, y, c, clamp8(acc / distance));
-                }
+        if (distance < 1)
+            distance = 1;
+        const cv::Mat rgb = rgbChannelsMat(src);
+        if (rgb.empty())
+            break;
+        cv::Mat kernel = cv::Mat::ones(1, distance, CV_64F) / distance;
+        writeRgbChannels(filterRgb(rgb, kernel), dst);
         break;
     }
     case 19: { // Horizontal Edge (Sobel Gy)
@@ -720,16 +729,12 @@ bool ImageProcessorCore::apply(const ImageBuffer& src, ImageBuffer& dst,
         break;
     }
     case 25: { // Median Smoothing
-        for (int y = 0; y < H; ++y)
-            for (int x = 0; x < W; ++x)
-                for (int c = 0; c < 3; ++c) {
-                    uint8_t vals[9];
-                    int i = 0;
-                    for (int dy = -1; dy <= 1; ++dy)
-                        for (int dx = -1; dx <= 1; ++dx)
-                            vals[i++] = px(src, x + dx, y + dy, c);
-                    setPx(dst, x, y, c, median9(vals));
-                }
+        const cv::Mat rgb = rgbChannelsMat(src);
+        if (rgb.empty())
+            break;
+        cv::Mat smoothed;
+        cv::medianBlur(rgb, smoothed, 3);
+        writeRgbChannels(smoothed, dst);
         break;
     }
     case 26: { // Grayscale Average

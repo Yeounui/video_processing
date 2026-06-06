@@ -59,7 +59,8 @@ Suggested order:
 1. Point and grayscale operations. Implemented for IDs `1`, `2`, `3`, `4`,
    `6`, `26`, `27`, and `28`.
 2. Flip and rotate geometry. Implemented for IDs `7` and `8`.
-3. Blur, sharpen, smoothing, and morphology.
+3. Blur, sharpen, smoothing, and morphology. Implemented for IDs `9`, `11`,
+   `12`, `13`, `14`, `15`, `16`, `17`, `18`, and `25`.
 4. Edge and frequency-like filters.
 5. Statistics-dependent algorithms.
 
@@ -76,6 +77,11 @@ Implementation note:
 - Flip uses `cv::flip` and remains dimension-preserving.
 - Rotate uses `cv::warpAffine` with the existing alpha-content bounds policy,
   nearest-neighbor sampling, RGBA output, and transparent constant borders.
+- Emboss, box blur, Gaussian blur, sharpen, high-pass sharpen, high-boost,
+  diagonal motion blur, horizontal motion blur, and median smoothing use
+  OpenCV CPU paths over RGB channels with alpha preserved from the input.
+- Filter border handling uses OpenCV replicate borders to match the prior
+  clamped-edge sampling contract.
 - Statistics-dependent IDs `5`, `10`, and `23` remain on the legacy loop path
   until the statistics contract is migrated.
 
