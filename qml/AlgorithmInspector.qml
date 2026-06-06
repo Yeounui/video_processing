@@ -132,25 +132,23 @@ Rectangle {
 
         Rectangle {
             Layout.fillWidth: true
-            Layout.preferredHeight: visible ? Math.min(220, paramContent.implicitHeight + 16) : 0
+            Layout.preferredHeight: visible ? Math.min(220, paramEditor.implicitHeight + 24) : 0
             visible: root.selectedAlgorithmId > 0 && root.selectedParams.length > 0
-            implicitHeight: Layout.preferredHeight
+            implicitHeight: visible ? Math.min(220, paramContent.implicitHeight + 24) : 0
             color: "#FFFFFF"
             border.color: "#E5E8EB"
             border.width: 1
 
-            ScrollView {
-                id: paramScroll
-                anchors.fill: parent
-                anchors.margins: 8
-                clip: true
-                contentWidth: availableWidth
-
-                ParameterEditor {
-                    id: paramEditor
-                    width: paramScroll.availableWidth
-                    paramSpecs: root.selectedParams
+            ParameterEditor {
+                id: paramEditor
+                anchors {
+                    left: parent.left
+                    right: parent.right
+                    top: parent.top
+                    margins: 10
                 }
+                height: implicitHeight
+                paramSpecs: root.selectedParams
             }
 
             Item {
