@@ -9,7 +9,6 @@ __pycache__/
 *.py[cod]
 *.md
 !README.md
-!github.md
 !assets/**/*.md
 plan/
 ui_template/
