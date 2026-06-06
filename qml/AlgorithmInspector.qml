@@ -159,7 +159,7 @@ Rectangle {
 
         Rectangle {
             Layout.fillWidth: true
-            height: 56
+            height: 48
             color: "#F8F8F5"
             border.color: "#E5E8EB"
             border.width: 1
@@ -167,27 +167,27 @@ Rectangle {
             RowLayout {
                 anchors {
                     fill: parent
-                    margins: 10
+                    margins: 8
                 }
-                spacing: 8
+                spacing: 5
 
                 Button {
                     id: applyButton
                     Layout.fillWidth: true
                     text: "Apply"
                     enabled: root.selectedAlgorithmId > 0 && ProcessingController.hasImage
-                    implicitHeight: 32
+                    implicitHeight: 30
                     onClicked: ProcessingController.applyAlgorithm(root.selectedAlgorithmId, paramEditor.paramValues)
 
                     background: Rectangle {
                         color: applyButton.enabled ? "#6F86AB" : "#D8DDE3"
-                        radius: 6
+                        radius: 5
                     }
 
                     contentItem: Text {
                         text: applyButton.text
                         color: applyButton.enabled ? "#FFFFFF" : "#6E747A"
-                        font.pixelSize: 13
+                        font.pixelSize: 12
                         horizontalAlignment: Text.AlignHCenter
                         verticalAlignment: Text.AlignVCenter
                     }
@@ -195,23 +195,23 @@ Rectangle {
 
                 Button {
                     id: undoButton
-                    Layout.preferredWidth: 72
+                    Layout.preferredWidth: 48
                     text: "Undo"
                     enabled: ProcessingController.canUndo
-                    implicitHeight: 32
+                    implicitHeight: 30
                     onClicked: ProcessingController.undo()
 
                     background: Rectangle {
                         color: "transparent"
                         border.color: undoButton.enabled ? "#C8D0D8" : "#E5E8EB"
                         border.width: 1
-                        radius: 6
+                        radius: 5
                     }
 
                     contentItem: Text {
                         text: undoButton.text
                         color: undoButton.enabled ? "#2F3438" : "#9AA1A8"
-                        font.pixelSize: 13
+                        font.pixelSize: 11
                         horizontalAlignment: Text.AlignHCenter
                         verticalAlignment: Text.AlignVCenter
                     }
@@ -219,23 +219,23 @@ Rectangle {
 
                 Button {
                     id: redoButton
-                    Layout.preferredWidth: 72
+                    Layout.preferredWidth: 48
                     text: "Redo"
                     enabled: ProcessingController.canRedo
-                    implicitHeight: 32
+                    implicitHeight: 30
                     onClicked: ProcessingController.redo()
 
                     background: Rectangle {
                         color: "transparent"
                         border.color: redoButton.enabled ? "#C8D0D8" : "#E5E8EB"
                         border.width: 1
-                        radius: 6
+                        radius: 5
                     }
 
                     contentItem: Text {
                         text: redoButton.text
                         color: redoButton.enabled ? "#2F3438" : "#9AA1A8"
-                        font.pixelSize: 13
+                        font.pixelSize: 11
                         horizontalAlignment: Text.AlignHCenter
                         verticalAlignment: Text.AlignVCenter
                     }
@@ -243,23 +243,23 @@ Rectangle {
 
                 Button {
                     id: resetButton
-                    Layout.preferredWidth: 72
+                    Layout.preferredWidth: 50
                     text: "Reset"
                     enabled: ProcessingController.hasImage
-                    implicitHeight: 32
+                    implicitHeight: 30
                     onClicked: ProcessingController.reset()
 
                     background: Rectangle {
                         color: "transparent"
                         border.color: resetButton.enabled ? "#C8D0D8" : "#E5E8EB"
                         border.width: 1
-                        radius: 6
+                        radius: 5
                     }
 
                     contentItem: Text {
                         text: resetButton.text
                         color: resetButton.enabled ? "#2F3438" : "#9AA1A8"
-                        font.pixelSize: 13
+                        font.pixelSize: 11
                         horizontalAlignment: Text.AlignHCenter
                         verticalAlignment: Text.AlignVCenter
                     }
