@@ -56,8 +56,8 @@ ApplicationWindow {
             }
 
             AlgorithmInspector {
-                Layout.preferredWidth: 280
-                Layout.minimumWidth: 260
+                Layout.preferredWidth: 224
+                Layout.minimumWidth: 224
                 Layout.fillHeight: true
             }
         }

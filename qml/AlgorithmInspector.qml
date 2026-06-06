@@ -169,11 +169,11 @@ Rectangle {
                     fill: parent
                     margins: 8
                 }
-                spacing: 5
+                spacing: 0
 
                 Button {
                     id: applyButton
-                    Layout.preferredWidth: 56
+                    Layout.fillWidth: true
                     text: "Apply"
                     enabled: root.selectedAlgorithmId > 0 && ProcessingController.hasImage
                     implicitHeight: 30
@@ -187,19 +187,15 @@ Rectangle {
                     contentItem: Text {
                         text: applyButton.text
                         color: applyButton.enabled ? "#FFFFFF" : "#6E747A"
-                        font.pixelSize: 12
+                        font.pixelSize: 11
                         horizontalAlignment: Text.AlignHCenter
                         verticalAlignment: Text.AlignVCenter
                     }
                 }
 
-                Item {
-                    Layout.fillWidth: true
-                }
-
                 Button {
                     id: undoButton
-                    Layout.preferredWidth: 48
+                    Layout.fillWidth: true
                     text: "Undo"
                     enabled: ProcessingController.canUndo
                     implicitHeight: 30
@@ -223,7 +219,7 @@ Rectangle {
 
                 Button {
                     id: redoButton
-                    Layout.preferredWidth: 48
+                    Layout.fillWidth: true
                     text: "Redo"
                     enabled: ProcessingController.canRedo
                     implicitHeight: 30
@@ -247,7 +243,7 @@ Rectangle {
 
                 Button {
                     id: resetButton
-                    Layout.preferredWidth: 50
+                    Layout.fillWidth: true
                     text: "Reset"
                     enabled: ProcessingController.hasImage
                     implicitHeight: 30
