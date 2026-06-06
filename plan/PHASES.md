@@ -139,6 +139,22 @@ Exit criteria:
 - Frame dropping policy under processing load is preserved or explicitly
   revised.
 
+Implementation note:
+
+- Video file playback now opens and decodes frames through OpenCV
+  `cv::VideoCapture`, converts BGR/BGRA frames to RGB/RGBA `ImageBuffer`
+  instances through `OpenCvImageBridge`, and keeps the public
+  `VideoInputService` API unchanged.
+- File metadata uses OpenCV `CAP_PROP_FPS`, `CAP_PROP_FRAME_COUNT`,
+  `CAP_PROP_FRAME_WIDTH`, and `CAP_PROP_FRAME_HEIGHT`; missing or invalid FPS
+  falls back to `25.0`, and missing frame-count metadata leaves duration at
+  `0.0`.
+- File seek uses OpenCV position properties and preserves the existing
+  `seekToSecs()` behavior of immediately delivering the next frame.
+- Real-time streams still use the existing FFmpeg producer, interrupt callback,
+  latest-frame handoff, reconnect timer, and status signals. Direct FFmpeg
+  removal remains blocked until stream timeout/reconnect parity is accepted.
+
 ## Phase 5: Introduce Acceleration Backend
 
 Status: generated

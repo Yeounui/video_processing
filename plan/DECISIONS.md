@@ -226,3 +226,22 @@ loads, unsupported layouts, and encoder exceptions return `nullptr` or `false`
 without changing the public API. PNG RGB/RGBA round trips are covered by tests;
 metadata preservation, EXIF auto-orientation, color profiles, and animated
 formats remain out of scope for this phase.
+
+## D-016: Video Files Use OpenCV VideoCapture While Streams Retain FFmpeg
+
+Status: verified
+
+Decision: migrate local video file acquisition in `VideoInputService::open()`
+to OpenCV `cv::VideoCapture`, but keep real-time stream acquisition on the
+existing FFmpeg producer path.
+
+Reason: file playback maps cleanly to OpenCV open/read/seek/metadata behavior
+and can be covered by deterministic generated-file tests. Stream behavior still
+depends on explicit interrupt, latest-frame handoff, reconnect timer, timeout,
+and status transitions that have not been proven equivalent with
+`cv::VideoCapture` in the target environment.
+
+Consequence: direct FFmpeg remains a build/runtime dependency until stream
+timeout and reconnect parity are either implemented with OpenCV or accepted as a
+revised behavior. `VideoInputService` now has two acquisition paths but one
+public RGB/RGBA `ImageBuffer` boundary.

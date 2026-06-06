@@ -8,6 +8,8 @@
 #include <mutex>
 #include <thread>
 
+#include <opencv2/videoio.hpp>
+
 extern "C" {
 #include <libavformat/avformat.h>
 #include <libavcodec/avcodec.h>
@@ -17,8 +19,8 @@ extern "C" {
 class QTimer;
 
 // Drives video file playback on the GUI thread via QTimer.
-// Uses the modern FFmpeg send/receive decode API.
-// Producer threads are NOT used for file sources (Phase 7 adds stream threading).
+// File sources use OpenCV VideoCapture; stream sources keep the FFmpeg producer
+// path until timeout/reconnect parity is accepted.
 class VideoInputService : public QObject {
     Q_OBJECT
 public:
@@ -75,6 +77,8 @@ private slots:
 private:
     // Decode one frame and return it, or nullptr on EOF/error.
     std::shared_ptr<ImageBuffer> decodeNextFrame();
+    std::shared_ptr<ImageBuffer> decodeVideoCaptureFrame();
+    std::shared_ptr<ImageBuffer> toImageBuffer(const cv::Mat &frame);
     std::shared_ptr<ImageBuffer> toImageBuffer(AVFrame *f);
 
     // Seek to timestamp in seconds (flushes decoder buffers).
@@ -83,6 +87,8 @@ private:
     void onDisplayTick();
     void onStreamDisconnected();
     void setStreamStatus(StreamStatus s);
+
+    cv::VideoCapture fileCapture_;
 
     AVFormatContext *fmtCtx_   = nullptr;
     AVCodecContext  *codecCtx_ = nullptr;

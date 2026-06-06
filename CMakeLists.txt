@@ -6,7 +6,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 find_package(Qt6 REQUIRED COMPONENTS Core Gui Qml Quick QuickControls2)
-find_package(OpenCV REQUIRED COMPONENTS core imgproc imgcodecs)
+find_package(OpenCV REQUIRED COMPONENTS core imgproc imgcodecs videoio)
 
 # FFmpeg prefix comes from the local shell environment. For this repo, source
 # .env before configuring or build from an activated Conda environment.
@@ -70,7 +70,7 @@ qt_add_qml_module(qt_ui
 )
 
 target_include_directories(qt_ui PRIVATE include)
-target_include_directories(qt_ui PRIVATE "${FFMPEG_PREFIX}/include")
+target_include_directories(qt_ui PRIVATE "${AVFORMAT_INCLUDE_DIR}")
 target_include_directories(qt_ui PRIVATE ${OpenCV_INCLUDE_DIRS})
 
 target_link_libraries(qt_ui
@@ -132,6 +132,24 @@ if(Qt6Test_FOUND AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests")
     add_test(NAME tst_ImageIoService COMMAND tst_ImageIoService)
     set_tests_properties(tst_ImageIoService PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
+    qt_add_executable(tst_VideoInputService
+        tests/tst_VideoInputService.cpp
+        include/VideoInputService.h
+        src/VideoInputService.cpp
+        include/OpenCvImageBridge.h
+        src/OpenCvImageBridge.cpp
+        include/ImageBuffer.h
+    )
+    target_include_directories(tst_VideoInputService PRIVATE include)
+    target_include_directories(tst_VideoInputService PRIVATE "${AVFORMAT_INCLUDE_DIR}")
+    target_include_directories(tst_VideoInputService PRIVATE ${OpenCV_INCLUDE_DIRS})
+    target_link_libraries(tst_VideoInputService PRIVATE Qt6::Core Qt6::Test ${OpenCV_LIBS} ${AVFORMAT_LIB} ${AVCODEC_LIB} ${AVUTIL_LIB} ${SWSCALE_LIB} x264_compat)
+    set_target_properties(tst_VideoInputService PROPERTIES
+        BUILD_RPATH "${FFMPEG_PREFIX}/lib;${CMAKE_BINARY_DIR}"
+        LINK_FLAGS "-Wl,-rpath-link,${FFMPEG_PREFIX}/lib,--allow-shlib-undefined"
+    )
+    add_test(NAME tst_VideoInputService COMMAND tst_VideoInputService)
+
     qt_add_executable(tst_ProcessingController
         tests/tst_ProcessingController.cpp
         include/EditCommand.h
@@ -152,7 +170,7 @@ if(Qt6Test_FOUND AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests")
         src/GpuEffectPipeline.cpp
     )
     target_include_directories(tst_ProcessingController PRIVATE include)
-    target_include_directories(tst_ProcessingController PRIVATE "${FFMPEG_PREFIX}/include")
+    target_include_directories(tst_ProcessingController PRIVATE "${AVFORMAT_INCLUDE_DIR}")
     target_include_directories(tst_ProcessingController PRIVATE ${OpenCV_INCLUDE_DIRS})
     target_link_libraries(tst_ProcessingController PRIVATE Qt6::Core Qt6::Gui Qt6::Qml Qt6::OpenGL Qt6::Test ${OpenCV_LIBS} ${AVFORMAT_LIB} ${AVCODEC_LIB} ${AVUTIL_LIB} ${SWSCALE_LIB} x264_compat)
     set_target_properties(tst_ProcessingController PROPERTIES

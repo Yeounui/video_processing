@@ -65,8 +65,8 @@ Out of scope:
 
 - Target OpenCV version and modules available in the `videoprocess` Conda
   environment.
-- Whether the packaged OpenCV `videoio` backend has FFmpeg support.
-- Required codec/container and stream scheme matrix.
+- Required production codec/container and stream scheme matrix beyond the
+  generated AVI file-video coverage.
 - Required latency budgets for local video, real-time streams, and stacked
   algorithms.
 - Expected GPU hardware and whether CUDA support is required, optional, or not

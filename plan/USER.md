@@ -11,14 +11,20 @@ Status: generated
 - Existing stop-hook verification in this workspace uses CMake build and CTest,
   not pytest.
 - OpenCV 4.13.0 is available through CMake in the `videoprocess` Conda
-  environment for the current `core`, `imgproc`, and `imgcodecs` modules.
+  environment for the current `core`, `imgproc`, `imgcodecs`, and `videoio`
+  modules.
+- CMake must use the discovered FFmpeg include directory from
+  `find_path(AVFORMAT_INCLUDE_DIR ...)`, not only `${FFMPEG_PREFIX}/include`,
+  because the active shell prefix can differ from the Conda environment that
+  provides FFmpeg headers.
 - The local CMake configure/build may warn that `WrapVulkanHeaders` is missing
   because `Vulkan_INCLUDE_DIR` is not set. This has not blocked the current
   Qt/OpenCV build or CTest suite.
 
 ## User Decisions Needed
 
-- Confirm whether the target OpenCV build includes FFmpeg-backed `videoio`.
+- Confirm whether the target OpenCV build's `videoio` backend supports every
+  required production codec/container and stream scheme.
 - Confirm whether expected GPU acceleration is CPU-only, OpenCL/UMat, CUDA, or
   runtime-selectable.
 - Provide target hardware constraints if performance budgets depend on a
@@ -47,4 +53,5 @@ are confirmed in this workspace. Do not replace execution with documentation.
 - `./build/tst_OpenCvImageBridge`
 - `./build/tst_ImageProcessorCore`
 - `QT_QPA_PLATFORM=offscreen ./build/tst_ImageIoService`
+- `./build/tst_VideoInputService`
 - `QT_QPA_PLATFORM=offscreen ./build/tst_ProcessingController`

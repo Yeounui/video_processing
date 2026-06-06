@@ -4,7 +4,8 @@
 
 ```text
 VideoInputService
-    decodes video frames with direct FFmpeg APIs
+    decodes file frames with cv::VideoCapture
+    decodes stream frames with direct FFmpeg APIs
     emits ImageBuffer frames
 
 ProcessingController
@@ -31,7 +32,7 @@ plus width, height, and channel count.
 ```text
 Qt/QML UI
     -> ProcessingController
-        -> VideoInputService       uses cv::VideoCapture if accepted
+        -> VideoInputService       uses cv::VideoCapture for files; FFmpeg remains for streams
         -> ImageIoService          uses cv::imread / cv::imwrite
         -> ImageProcessorCore      uses cv::Mat + cv::imgproc
         -> ProcessingBackend       uses cv::Mat, cv::UMat, or cv::cuda::GpuMat
@@ -207,6 +208,28 @@ The OpenCV video path must define:
 accepted. If OpenCV cannot provide equivalent timeout, reconnect, or metadata
 control in the target environment, direct FFmpeg may need to remain as a
 fallback.
+
+Implemented file-video contract:
+
+- Local video files opened through `VideoInputService::open()` use
+  `cv::VideoCapture` and keep the existing controller-facing API.
+- Frames decoded from OpenCV are treated as BGR/BGRA unless decoded as
+  grayscale, then converted to RGB/RGBA `ImageBuffer` output through
+  `OpenCvImageBridge`.
+- Unsupported decoded frame depths or channel counts fail frame conversion
+  instead of leaking invalid layouts.
+- FPS metadata uses `CAP_PROP_FPS`; invalid or unavailable FPS falls back to
+  `25.0`.
+- Duration is `CAP_PROP_FRAME_COUNT / fps` when frame count is available and
+  remains `0.0` otherwise.
+- File width and height come from `CAP_PROP_FRAME_WIDTH` and
+  `CAP_PROP_FRAME_HEIGHT`.
+- `seekToSecs()` maps to OpenCV position properties and then decodes the next
+  frame, preserving the previous public behavior.
+- File EOF still returns no frame from `stepForward()` and lets timer playback
+  handle loop or `playbackFinished()`.
+- Real-time stream open, latest-frame display, disconnect, reconnect, timeout
+  interrupt, and status reporting still use the existing FFmpeg path.
 
 ## Image I/O Spec
 

@@ -16,7 +16,7 @@ requirements.
 | --- | --- | --- | --- |
 | [[README]] | generated | Current status, document map, source evidence, and open questions. | Review generated status and source evidence. |
 | [[OVERVIEW]] | generated | Goal, scope, non-goals, and constraints. | Review scope before implementation. |
-| [[PHASES]] | generated | Suggested implementation order and phase gates. | Continue Phase 4 video capture evaluation. |
+| [[PHASES]] | generated | Suggested implementation order and phase gates. | Continue Phase 4 stream capture evaluation. |
 | [[ARCHITECTURE]] | generated | Qt/OpenCV boundary, data model, algorithm stack model, and required specs. | Resolve open questions before code changes. |
 | [[DECISIONS]] | generated | Decisions extracted from current plan notes and existing code behavior. | Add decisions as migration behavior changes. |
 | [[REVIEW]] | generated | Parity, QA, benchmark, and regression policy. | Turn acceptance cases into tests/manual checks. |
@@ -44,9 +44,14 @@ requirements.
   grayscale to RGB and converting BGR/BGRA to RGB/RGBA.
 - Image saves reject invalid or empty buffers, convert RGB/RGBA to BGR/BGRA for
   OpenCV, and drop alpha for JPEG output.
+- Video file playback uses OpenCV `cv::VideoCapture` inside
+  `VideoInputService` while preserving RGB/RGBA `ImageBuffer` output and the
+  existing controller API.
+- Real-time streams still use the existing FFmpeg producer/reconnect path
+  pending timeout and reconnect parity review.
 - The current public image boundary is `ImageBuffer`.
 - OpenCV 4.13.0 is found in the `videoprocess` Conda environment for `core`,
-  `imgproc`, and `imgcodecs`.
+  `imgproc`, `imgcodecs`, and `videoio`.
 - Current GPU processing uses `GpuEffectPipeline` for a subset of algorithms.
 - Current video stack optimization uses a CPU prefix plus GPU suffix model.
 - Plan documents are intended to be tracked through the `.gitignore`
@@ -75,6 +80,12 @@ requirements.
   `imgcodecs` while preserving RGB/RGBA `ImageBuffer` color order, PNG alpha
   round trips, and failure behavior. `cmake --build build` and
   `ctest --test-dir build --output-on-failure` passed after the migration.
+- 2026-06-06: video file playback was migrated from direct FFmpeg decode to
+  OpenCV `cv::VideoCapture`, with FFmpeg retained for real-time stream
+  producer/reconnect behavior. `tst_VideoInputService` covers generated AVI
+  open, metadata, RGB frame conversion, EOF stepping, and missing-file errors.
+  `cmake --build build` and `ctest --test-dir build --output-on-failure`
+  passed after the migration.
 
 ## Source Evidence
 
@@ -87,6 +98,7 @@ requirements.
 - Stack support tests: `tests/tst_ProcessingController.cpp`
 - Bridge tests: `tests/tst_OpenCvImageBridge.cpp`
 - Image I/O tests: `tests/tst_ImageIoService.cpp`
+- Video input tests: `tests/tst_VideoInputService.cpp`
 - Prior local commits inspected:
   - `07906a5 Accelerate video effect stacks`
   - `fc7686b Reduce median and hybrid stack bottlenecks`

@@ -1,11 +1,25 @@
 #include "VideoInputService.h"
+#include "OpenCvImageBridge.h"
 #include <QByteArray>
 #include <QMetaObject>
 #include <QTimer>
 #include <algorithm>
 #include <cerrno>
+#include <cmath>
+
+#include <opencv2/imgproc.hpp>
 
 namespace {
+std::string toOpenCvPath(const QString &path)
+{
+    return path.toUtf8().toStdString();
+}
+
+double validFrameRateOrFallback(double fps)
+{
+    return std::isfinite(fps) && fps > 0.0 ? fps : 25.0;
+}
+
 int interruptCallback(void *opaque)
 {
     auto *stop = static_cast<std::atomic<bool> *>(opaque);
@@ -40,97 +54,15 @@ bool VideoInputService::open(const QString &path)
     closeStream();
     close();
 
-    // Open input file
-    int ret = avformat_open_input(&fmtCtx_, path.toUtf8().constData(), nullptr, nullptr);
-    if (ret < 0) {
+    if (!fileCapture_.open(toOpenCvPath(path), cv::CAP_ANY)) {
         emit errorOccurred(QString("Failed to open video file: %1").arg(path));
         return false;
     }
 
-    // Find stream info
-    ret = avformat_find_stream_info(fmtCtx_, nullptr);
-    if (ret < 0) {
-        avformat_close_input(&fmtCtx_);
-        fmtCtx_ = nullptr;
-        emit errorOccurred("Failed to find stream info");
-        return false;
-    }
-
-    // Find video stream
-    videoStreamIdx_ = -1;
-    for (unsigned int i = 0; i < fmtCtx_->nb_streams; ++i) {
-        if (fmtCtx_->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_VIDEO) {
-            videoStreamIdx_ = static_cast<int>(i);
-            break;
-        }
-    }
-
-    if (videoStreamIdx_ < 0) {
-        avformat_close_input(&fmtCtx_);
-        fmtCtx_ = nullptr;
-        emit errorOccurred("No video stream found");
-        return false;
-    }
-
-    // Get codec
-    AVCodecParameters *codecParams = fmtCtx_->streams[videoStreamIdx_]->codecpar;
-    const AVCodec *codec = avcodec_find_decoder(codecParams->codec_id);
-    if (!codec) {
-        avformat_close_input(&fmtCtx_);
-        fmtCtx_ = nullptr;
-        emit errorOccurred("Codec not found");
-        return false;
-    }
-
-    // Allocate codec context and copy codec parameters
-    codecCtx_ = avcodec_alloc_context3(codec);
-    if (!codecCtx_) {
-        avformat_close_input(&fmtCtx_);
-        fmtCtx_ = nullptr;
-        emit errorOccurred("Failed to allocate codec context");
-        return false;
-    }
-
-    ret = avcodec_parameters_to_context(codecCtx_, codecParams);
-    if (ret < 0) {
-        avcodec_free_context(&codecCtx_);
-        avformat_close_input(&fmtCtx_);
-        fmtCtx_ = nullptr;
-        emit errorOccurred("Failed to copy codec parameters");
-        return false;
-    }
-
-    // Open codec
-    ret = avcodec_open2(codecCtx_, codec, nullptr);
-    if (ret < 0) {
-        avcodec_free_context(&codecCtx_);
-        avformat_close_input(&fmtCtx_);
-        fmtCtx_ = nullptr;
-        emit errorOccurred("Failed to open codec");
-        return false;
-    }
-
-    // Allocate frame
-    frame_ = av_frame_alloc();
-    if (!frame_) {
-        avcodec_free_context(&codecCtx_);
-        avformat_close_input(&fmtCtx_);
-        fmtCtx_ = nullptr;
-        emit errorOccurred("Failed to allocate frame");
-        return false;
-    }
-
-    // Compute FPS from avg_frame_rate (AVRational: num/den)
-    AVRational frameRate = fmtCtx_->streams[videoStreamIdx_]->avg_frame_rate;
-    if (frameRate.num > 0 && frameRate.den > 0) {
-        fps_ = static_cast<double>(frameRate.num) / static_cast<double>(frameRate.den);
-    } else {
-        fps_ = 25.0;  // fallback
-    }
-
-    // Compute duration in seconds
-    if (fmtCtx_->duration > 0) {
-        durationSecs_ = static_cast<double>(fmtCtx_->duration) / static_cast<double>(AV_TIME_BASE);
+    fps_ = validFrameRateOrFallback(fileCapture_.get(cv::CAP_PROP_FPS));
+    const double frameCount = fileCapture_.get(cv::CAP_PROP_FRAME_COUNT);
+    if (std::isfinite(frameCount) && frameCount > 0.0 && fps_ > 0.0) {
+        durationSecs_ = frameCount / fps_;
     } else {
         durationSecs_ = 0.0;
     }
@@ -142,6 +74,7 @@ bool VideoInputService::open(const QString &path)
 void VideoInputService::close()
 {
     playTimer_->stop();
+    fileCapture_.release();
 
     if (codecCtx_) {
         avcodec_free_context(&codecCtx_);
@@ -333,6 +266,10 @@ void VideoInputService::reconnectStream()
 
 bool VideoInputService::isOpen() const
 {
+    if (!isStream_) {
+        return fileCapture_.isOpened();
+    }
+
     return fmtCtx_ != nullptr && codecCtx_ != nullptr && frame_ != nullptr;
 }
 
@@ -348,11 +285,19 @@ double VideoInputService::fps() const
 
 int VideoInputService::videoWidth() const
 {
+    if (fileCapture_.isOpened()) {
+        return static_cast<int>(std::lround(fileCapture_.get(cv::CAP_PROP_FRAME_WIDTH)));
+    }
+
     return codecCtx_ ? codecCtx_->width : 0;
 }
 
 int VideoInputService::videoHeight() const
 {
+    if (fileCapture_.isOpened()) {
+        return static_cast<int>(std::lround(fileCapture_.get(cv::CAP_PROP_FRAME_HEIGHT)));
+    }
+
     return codecCtx_ ? codecCtx_->height : 0;
 }
 
@@ -427,6 +372,9 @@ double VideoInputService::currentTimeSecs() const
 std::shared_ptr<ImageBuffer> VideoInputService::decodeNextFrame()
 {
     if (!isOpen()) return nullptr;
+    if (!isStream_) {
+        return decodeVideoCaptureFrame();
+    }
 
     AVPacket *pkt = av_packet_alloc();
     if (!pkt) {
@@ -476,6 +424,60 @@ std::shared_ptr<ImageBuffer> VideoInputService::decodeNextFrame()
     }
 }
 
+std::shared_ptr<ImageBuffer> VideoInputService::decodeVideoCaptureFrame()
+{
+    cv::Mat frame;
+    if (!fileCapture_.read(frame) || frame.empty()) {
+        return nullptr;
+    }
+
+    auto buf = toImageBuffer(frame);
+    if (!buf) {
+        return nullptr;
+    }
+
+    const double posMillis = fileCapture_.get(cv::CAP_PROP_POS_MSEC);
+    if (std::isfinite(posMillis) && posMillis > 0.0) {
+        currentTimeSecs_ = posMillis / 1000.0;
+    } else {
+        const double posFrames = fileCapture_.get(cv::CAP_PROP_POS_FRAMES);
+        if (std::isfinite(posFrames) && posFrames > 0.0 && fps_ > 0.0) {
+            currentTimeSecs_ = (posFrames - 1.0) / fps_;
+        }
+    }
+
+    return buf;
+}
+
+std::shared_ptr<ImageBuffer> VideoInputService::toImageBuffer(const cv::Mat &frame)
+{
+    if (frame.empty() || frame.depth() != CV_8U) {
+        return nullptr;
+    }
+
+    cv::Mat boundary;
+    OpenCvImageBridge::ColorOrder colorOrder = OpenCvImageBridge::ColorOrder::Bgr;
+    switch (frame.channels()) {
+    case 1:
+        cv::cvtColor(frame, boundary, cv::COLOR_GRAY2RGB);
+        colorOrder = OpenCvImageBridge::ColorOrder::Rgb;
+        break;
+    case 3:
+    case 4:
+        boundary = frame;
+        colorOrder = OpenCvImageBridge::ColorOrder::Bgr;
+        break;
+    default:
+        return nullptr;
+    }
+
+    auto buf = std::make_shared<ImageBuffer>();
+    if (!OpenCvImageBridge::copyMatToImageBuffer(boundary, *buf, colorOrder)) {
+        return nullptr;
+    }
+    return buf;
+}
+
 std::shared_ptr<ImageBuffer> VideoInputService::toImageBuffer(AVFrame *f)
 {
     if (!f || !codecCtx_) {
@@ -523,6 +525,16 @@ std::shared_ptr<ImageBuffer> VideoInputService::toImageBuffer(AVFrame *f)
 void VideoInputService::seekInternal(double secs)
 {
     if (!isOpen()) return;
+    if (!isStream_) {
+        const double clampedSecs = std::max(0.0, secs);
+        if (clampedSecs == 0.0) {
+            fileCapture_.set(cv::CAP_PROP_POS_FRAMES, 0.0);
+        } else {
+            fileCapture_.set(cv::CAP_PROP_POS_MSEC, clampedSecs * 1000.0);
+        }
+        currentTimeSecs_ = clampedSecs;
+        return;
+    }
 
     AVStream *stream = fmtCtx_->streams[videoStreamIdx_];
     int64_t ts = static_cast<int64_t>(secs / av_q2d(stream->time_base));

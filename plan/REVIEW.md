@@ -77,6 +77,9 @@ Current automated coverage:
 - `tst_ImageIoService` covers OpenCV-backed RGB PNG load color order,
   transparent PNG alpha preservation, RGB and RGBA PNG save/load round trips,
   missing-file load failure, and invalid-buffer save failure.
+- `tst_VideoInputService` covers OpenCV-backed generated AVI open, file
+  metadata, BGR-to-RGB frame conversion, EOF stepping behavior, and missing-file
+  error reporting.
 
 ## Video And Stream Acceptance
 
@@ -91,6 +94,14 @@ Video file behavior must cover:
 - Playback speed.
 - End-of-file.
 - Metadata fallback when fps, duration, or frame count is unavailable.
+
+Current automated coverage:
+
+- Generated local AVI open, metadata, step, RGB frame conversion, EOF stepping,
+  and missing-file errors are covered.
+- Play/pause timer behavior, seek precision across codecs, loop, playback
+  speed, and missing-metadata fallback still need targeted automated or manual
+  coverage before Phase 4 can be marked fully verified.
 
 Real-time stream behavior must cover:
 
