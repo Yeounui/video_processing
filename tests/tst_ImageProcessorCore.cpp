@@ -61,6 +61,8 @@ private slots:
     void testGrayscaleLightness();
     void testOpenCvGrayscalePreservesAlphaAndClearsTransparentRgb();
     void testContrastStretch();
+    void testOpenCvStatsPreserveAlphaAndClearsTransparentRgb();
+    void testStatsEqualRangeCopiesRgbAndClearsTransparentRgb();
     void testSpecsCount();
     void testSpecsIds();
     void testAverageThreshold();
@@ -462,6 +464,63 @@ void TestImageProcessorCore::testContrastStretch() {
     p["stat_max"] = 150;
     ImageProcessorCore::apply(src, dst, 10, p);
     QCOMPARE(getPx(dst, 0, 0, 0), (uint8_t)128);
+}
+
+void TestImageProcessorCore::testOpenCvStatsPreserveAlphaAndClearsTransparentRgb() {
+    const int algorithmIds[] = {5, 10, 23};
+
+    for (int algorithmId : algorithmIds) {
+        auto src = makeRgbaImage();
+        ImageBuffer dst;
+        EffectParams p;
+        if (algorithmId == 5) {
+            p["stat_average"] = 20.0;
+        } else if (algorithmId == 10) {
+            p["stat_min"] = 0;
+            p["stat_max"] = 100;
+        } else if (algorithmId == 23) {
+            p["stat_hmin"] = 0;
+            p["stat_hmax"] = 100;
+        }
+
+        QVERIFY2(ImageProcessorCore::apply(src, dst, algorithmId, p),
+                 "algorithm failed");
+        QCOMPARE(dst.channels, 4);
+        QCOMPARE(getPx(dst, 0, 0, 0), (uint8_t)0);
+        QCOMPARE(getPx(dst, 0, 0, 1), (uint8_t)0);
+        QCOMPARE(getPx(dst, 0, 0, 2), (uint8_t)0);
+        QCOMPARE(getPx(dst, 0, 0, 3), (uint8_t)0);
+        QCOMPARE(getPx(dst, 1, 0, 3), (uint8_t)128);
+    }
+}
+
+void TestImageProcessorCore::testStatsEqualRangeCopiesRgbAndClearsTransparentRgb() {
+    const int algorithmIds[] = {10, 23};
+
+    for (int algorithmId : algorithmIds) {
+        auto src = makeRgbaImage();
+        ImageBuffer dst;
+        EffectParams p;
+        if (algorithmId == 10) {
+            p["stat_min"] = 42;
+            p["stat_max"] = 42;
+        } else {
+            p["stat_hmin"] = 42;
+            p["stat_hmax"] = 42;
+        }
+
+        QVERIFY2(ImageProcessorCore::apply(src, dst, algorithmId, p),
+                 "algorithm failed");
+        QCOMPARE(dst.channels, 4);
+        QCOMPARE(getPx(dst, 0, 0, 0), (uint8_t)0);
+        QCOMPARE(getPx(dst, 0, 0, 1), (uint8_t)0);
+        QCOMPARE(getPx(dst, 0, 0, 2), (uint8_t)0);
+        QCOMPARE(getPx(dst, 0, 0, 3), (uint8_t)0);
+        QCOMPARE(getPx(dst, 1, 0, 0), (uint8_t)10);
+        QCOMPARE(getPx(dst, 1, 0, 1), (uint8_t)20);
+        QCOMPARE(getPx(dst, 1, 0, 2), (uint8_t)30);
+        QCOMPARE(getPx(dst, 1, 0, 3), (uint8_t)128);
+    }
 }
 
 void TestImageProcessorCore::testSpecsCount() {

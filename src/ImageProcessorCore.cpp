@@ -135,6 +135,26 @@ static cv::Mat gaussianBlurRgb(const cv::Mat& rgb, int kernelSize, double sigma)
     return blurred;
 }
 
+static cv::Mat stretchRgbWithStats(const cv::Mat& rgb, int statMin, int statMax,
+                                   bool multiplyBeforeDivide) {
+    if (statMin == statMax)
+        return rgb.clone();
+
+    const int denominator = statMax - statMin;
+    const double scale = 255.0 / (statMax - statMin);
+    cv::Mat lut(1, 256, CV_8UC1);
+    for (int i = 0; i < 256; ++i) {
+        const double stretched = multiplyBeforeDivide
+            ? ((i - statMin) * 255.0) / denominator
+            : (i - statMin) * scale;
+        lut.at<uint8_t>(0, i) = clamp8(stretched);
+    }
+
+    cv::Mat stretched;
+    cv::LUT(rgb, lut, stretched);
+    return stretched;
+}
+
 static cv::Mat rgbaGeometryMat(const ImageBuffer& src) {
     const cv::Mat srcView = OpenCvImageBridge::constMatView(src);
     if (srcView.empty())
@@ -307,14 +327,12 @@ bool ImageProcessorCore::apply(const ImageBuffer& src, ImageBuffer& dst,
     }
     case 5: { // Average Threshold
         double average = params.value("stat_average", 128).toDouble();
-        for (int y = 0; y < H; ++y)
-            for (int x = 0; x < W; ++x) {
-                double l = lum(px(src, x, y, 0), px(src, x, y, 1), px(src, x, y, 2));
-                uint8_t v = (l >= average) ? 255 : 0;
-                setPx(dst, x, y, 0, v);
-                setPx(dst, x, y, 1, v);
-                setPx(dst, x, y, 2, v);
-            }
+        const cv::Mat rgb = rgbChannelsMat(src);
+        if (rgb.empty())
+            break;
+        cv::Mat mask;
+        cv::compare(luminanceMat(rgb), cv::Scalar(average), mask, cv::CMP_GE);
+        writeRgbChannels(mergeGrayToRgb(mask), dst);
         break;
     }
     case 6: { // Bitwise AND
@@ -454,21 +472,10 @@ bool ImageProcessorCore::apply(const ImageBuffer& src, ImageBuffer& dst,
     case 10: { // Contrast Stretch
         int stat_min = params.value("stat_min", 0).toInt();
         int stat_max = params.value("stat_max", 255).toInt();
-        if (stat_min == stat_max) {
-            for (int i = 0; i < (int)src.data.size(); ++i)
-                dst.data[i] = src.data[i];
-        } else {
-            // Use integer arithmetic where possible to minimize floating point error
-            int denom = stat_max - stat_min;
-            for (int y = 0; y < H; ++y)
-                for (int x = 0; x < W; ++x)
-                    for (int c = 0; c < 3; ++c) {
-                        int v = px(src, x, y, c);
-                        // (v - min) * 255 / denom
-                        double stretched = ((v - stat_min) * 255.0) / denom;
-                        setPx(dst, x, y, c, clamp8(stretched));
-                    }
-        }
+        const cv::Mat rgb = rgbChannelsMat(src);
+        if (rgb.empty())
+            break;
+        writeRgbChannels(stretchRgbWithStats(rgb, stat_min, stat_max, true), dst);
         break;
     }
     case 11: { // 3x3 Blur
@@ -644,19 +651,10 @@ bool ImageProcessorCore::apply(const ImageBuffer& src, ImageBuffer& dst,
     case 23: { // Histogram Stretch
         int stat_hmin = params.value("stat_hmin", 0).toInt();
         int stat_hmax = params.value("stat_hmax", 255).toInt();
-        if (stat_hmin == stat_hmax) {
-            for (int i = 0; i < (int)src.data.size(); ++i)
-                dst.data[i] = src.data[i];
-        } else {
-            double scale = 255.0 / (stat_hmax - stat_hmin);
-            for (int y = 0; y < H; ++y)
-                for (int x = 0; x < W; ++x)
-                    for (int c = 0; c < 3; ++c) {
-                        uint8_t v = px(src, x, y, c);
-                        double stretched = (v - stat_hmin) * scale;
-                        setPx(dst, x, y, c, clamp8(stretched));
-                    }
-        }
+        const cv::Mat rgb = rgbChannelsMat(src);
+        if (rgb.empty())
+            break;
+        writeRgbChannels(stretchRgbWithStats(rgb, stat_hmin, stat_hmax, false), dst);
         break;
     }
     case 24: { // Endpoint Detection

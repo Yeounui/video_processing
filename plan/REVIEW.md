@@ -71,7 +71,9 @@ Current automated coverage:
   flip alpha preservation, `Rotate -> Brightness` transparent-background
   cleanup, OpenCV filter alpha preservation, `Rotate -> Blur`
   transparent-background cleanup, OpenCV edge/DoG/endpoint alpha preservation,
-  and `Rotate -> Edge` transparent-background cleanup.
+  `Rotate -> Edge` transparent-background cleanup, OpenCV statistics alpha
+  preservation, and flat-range statistics copy behavior with transparent RGB
+  cleanup.
 
 ## Video And Stream Acceptance
 

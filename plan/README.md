@@ -25,10 +25,8 @@ requirements.
 ## Current Status
 
 - Phase 1 is verified with an `ImageBuffer` / `cv::Mat` bridge.
-- Phase 2 CPU migration has started in `ImageProcessorCore`.
-- Algorithm IDs `1`, `2`, `3`, `4`, `6`, `7`, `8`, `9`, `11`, `12`,
-  `13`, `14`, `15`, `16`, `17`, `18`, `19`, `20`, `21`, `22`, `24`,
-  `25`, `26`, `27`, and `28` currently use OpenCV-backed CPU paths.
+- Phase 2 CPU migration is implemented in `ImageProcessorCore`.
+- Algorithm IDs `1` through `28` currently use OpenCV-backed CPU paths.
 - Rotate remains geometry-materializing, always outputs RGBA, and keeps
   transparent borders `(0, 0, 0, 0)` for later stack operations.
 - Blur, sharpen, motion blur, emboss, and median smoothing process RGB only,
@@ -36,11 +34,11 @@ requirements.
   operation.
 - Sobel edge, Laplacian, DoG, and endpoint detection also process RGB-derived
   data only, preserve source alpha, and clear RGB for fully transparent pixels.
+- Statistics-dependent algorithms consume CPU-computed `stat_*` parameters and
+  apply them through OpenCV mask/LUT operations while preserving alpha.
 - The current public image boundary is `ImageBuffer`.
 - OpenCV 4.13.0 is found in the `videoprocess` Conda environment for `core`
   and `imgproc`.
-- Remaining CPU algorithms still use `ImageProcessorCore` with legacy
-  hand-written loops.
 - Current GPU processing uses `GpuEffectPipeline` for a subset of algorithms.
 - Current video stack optimization uses a CPU prefix plus GPU suffix model.
 - Plan documents are intended to be tracked through the `.gitignore`
@@ -60,6 +58,10 @@ requirements.
 - 2026-06-06: edge, DoG, and endpoint CPU algorithms were migrated to OpenCV
   and covered with alpha-preservation and post-rotate transparent-background
   tests. `cmake --build build` and
+  `ctest --test-dir build --output-on-failure` passed after the migration.
+- 2026-06-06: statistics-dependent CPU algorithms were migrated to OpenCV
+  while preserving CPU-computed `stat_*` parameter semantics and flat-range
+  copy behavior. `cmake --build build` and
   `ctest --test-dir build --output-on-failure` passed after the migration.
 
 ## Source Evidence

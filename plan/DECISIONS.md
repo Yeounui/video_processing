@@ -188,3 +188,22 @@ path.
 Consequence: Sobel and Laplacian use replicate borders for clamped-edge parity,
 DoG uses RGB Gaussian blur output as its OpenCV source, and endpoint detection
 uses a zero-padded foreground mask so out-of-image neighbors remain background.
+
+## D-014: Statistics Algorithms Consume CPU-Computed Parameters
+
+Status: verified
+
+Decision: keep the existing `stat_average`, `stat_min/stat_max`, and
+`stat_hmin/stat_hmax` parameter contract and migrate only the per-pixel CPU
+application of those statistics to OpenCV.
+
+Reason: static image and GPU paths already compute statistics on the CPU before
+dispatch. Changing the parameter contract would split CPU and GPU behavior and
+would make hybrid stacks harder to reason about.
+
+Consequence: average threshold uses an OpenCV luminance comparison, while
+contrast stretch and histogram stretch use OpenCV LUT application whose entries
+are generated with the legacy arithmetic ordering, `clamp8` rounding, and
+saturation policy. Flat statistic ranges copy RGB from the source while
+preserving alpha and still clear RGB for fully transparent pixels before
+returning.
