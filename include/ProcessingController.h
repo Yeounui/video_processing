@@ -39,6 +39,8 @@ class ProcessingController : public QObject {
     Q_PROPERTY(int effectStackSize READ effectStackSize NOTIFY effectStackChanged)
 
 public:
+    struct EffectEntry { int algorithmId; QVariantMap params; };
+
     explicit ProcessingController(QObject *parent = nullptr);
     ~ProcessingController() override;
 
@@ -67,6 +69,8 @@ public:
     quint64 inImageVersion() const;
     quint64 outImageVersion() const;
     void setOutImageDirect(std::shared_ptr<ImageBuffer> img);
+    const std::vector<EffectEntry> &effectStack() const { return effectStack_; }
+    bool videoEffectStackUsesGpu() const;
 
     // GPU state accessors
     bool gpuApplyPending() const { return gpuApplyPending_; }
@@ -127,6 +131,7 @@ private:
     QStringList visibleHistoryLabels() const;
     // Apply effectStack_ to src sequentially; returns result or src if stack is empty.
     std::shared_ptr<ImageBuffer> applyEffectStack(std::shared_ptr<ImageBuffer> src);
+    std::shared_ptr<ImageBuffer> applyEffectStackCpu(std::shared_ptr<ImageBuffer> src);
 
     std::shared_ptr<ImageBuffer> inImage_;
     std::shared_ptr<ImageBuffer> outImage_;
@@ -150,8 +155,12 @@ private:
     double videoPosition_ = 0.0;
 
     // Effect stack (video/stream mode only; max 3)
-    struct EffectEntry { int algorithmId; QVariantMap params; };
     static constexpr int MaxEffectStack = 3;
     std::vector<EffectEntry> effectStack_;
     QStringList effectStackLabels_;
+    std::shared_ptr<ImageBuffer> cpuScratchA_;
+    std::shared_ptr<ImageBuffer> cpuScratchB_;
+    bool nextCpuScratchA_ = true;
+    qint64 lastFrameProcessMs_ = 0;
+    bool dropNextCpuFrame_ = false;
 };

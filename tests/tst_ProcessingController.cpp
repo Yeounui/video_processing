@@ -1,4 +1,5 @@
 #include <QtTest>
+#include "GpuEffectPipeline.h"
 #include "ProcessingController.h"
 #include <QImage>
 #include <QTemporaryDir>
@@ -9,6 +10,7 @@ private slots:
     void testOpenImageFromFileUrl();
     void testOpenSourceRoutesImageByExtension();
     void testHistoryLabelsTrackApplyUndoRedoReset();
+    void testGpuFusedStackSupport();
 };
 
 void TestProcessingController::testOpenImageFromFileUrl() {
@@ -86,6 +88,28 @@ void TestProcessingController::testHistoryLabelsTrackApplyUndoRedoReset() {
     controller.reset();
     QVERIFY(controller.historyLabels().isEmpty());
     QCOMPARE(controller.historyIndex(), -1);
+}
+
+void TestProcessingController::testGpuFusedStackSupport() {
+    std::vector<GpuEffectCommand> fused = {
+        {7, QVariantMap{{QStringLiteral("mode"), QStringLiteral("H")}}},
+        {1, QVariantMap{{QStringLiteral("delta"), 12}}},
+        {26, QVariantMap{}},
+    };
+    QVERIFY(GpuEffectPipeline::supportsFusedStack(fused));
+
+    std::vector<GpuEffectCommand> multiPass = {
+        {7, QVariantMap{{QStringLiteral("mode"), QStringLiteral("H")}}},
+        {11, QVariantMap{}},
+    };
+    QVERIFY(GpuEffectPipeline::supportsAlgorithm(11));
+    QVERIFY(!GpuEffectPipeline::supportsFusedStack(multiPass));
+
+    std::vector<GpuEffectCommand> cpuOnly = {
+        {8, QVariantMap{{QStringLiteral("degree"), 30.0}}},
+    };
+    QVERIFY(!GpuEffectPipeline::supportsAlgorithm(8));
+    QVERIFY(!GpuEffectPipeline::supportsFusedStack(cpuOnly));
 }
 
 QTEST_MAIN(TestProcessingController)

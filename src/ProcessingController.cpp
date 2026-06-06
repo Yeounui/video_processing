@@ -5,8 +5,10 @@
 #include "GpuEffectPipeline.h"
 #include "VideoInputService.h"
 #include <QFileInfo>
+#include <QElapsedTimer>
 #include <QStringList>
 #include <QUrl>
+#include <algorithm>
 #include <utility>
 
 namespace {
@@ -94,6 +96,22 @@ int ProcessingController::streamStatus() const
 int ProcessingController::effectStackSize() const
 {
     return static_cast<int>(effectStack_.size());
+}
+
+bool ProcessingController::videoEffectStackUsesGpu() const
+{
+    if (sourceType_ != SourceType::SOURCE_VIDEO_FILE
+        && sourceType_ != SourceType::SOURCE_REALTIME_STREAM) {
+        return false;
+    }
+
+    if (effectStack_.empty()) {
+        return false;
+    }
+
+    return std::all_of(effectStack_.begin(), effectStack_.end(), [](const EffectEntry &effect) {
+        return GpuEffectPipeline::supportsAlgorithm(effect.algorithmId);
+    });
 }
 
 bool ProcessingController::hasImage() const
@@ -604,14 +622,29 @@ void ProcessingController::clearEffectStack()
 
 std::shared_ptr<ImageBuffer> ProcessingController::applyEffectStack(std::shared_ptr<ImageBuffer> src)
 {
+    if (videoEffectStackUsesGpu()) {
+        return src;
+    }
+
+    return applyEffectStackCpu(std::move(src));
+}
+
+std::shared_ptr<ImageBuffer> ProcessingController::applyEffectStackCpu(std::shared_ptr<ImageBuffer> src)
+{
     auto cur = src;
+    bool useA = nextCpuScratchA_;
     for (const auto &e : effectStack_) {
-        auto out = std::make_shared<ImageBuffer>();
+        auto &out = useA ? cpuScratchA_ : cpuScratchB_;
+        if (!out) {
+            out = std::make_shared<ImageBuffer>();
+        }
         if (!ImageProcessorCore::apply(*cur, *out, e.algorithmId, e.params)) {
             break;
         }
         cur = out;
+        useA = !useA;
     }
+    nextCpuScratchA_ = !nextCpuScratchA_;
     return cur;
 }
 
@@ -620,7 +653,31 @@ void ProcessingController::onVideoFrame(std::shared_ptr<ImageBuffer> frame)
     bool wasEmpty = !inImage_;
     inImage_ = frame;
     ++inImageVersion_;
+
+    if (!videoEffectStackUsesGpu() && !effectStack_.empty()
+        && (sourceType_ == SourceType::SOURCE_VIDEO_FILE
+            || sourceType_ == SourceType::SOURCE_REALTIME_STREAM)
+        && dropNextCpuFrame_) {
+        dropNextCpuFrame_ = false;
+        emit imageChanged();
+        if (wasEmpty) {
+            emit hasImageChanged();
+        }
+        return;
+    }
+
+    QElapsedTimer timer;
+    timer.start();
     outImage_ = applyEffectStack(frame);
+    lastFrameProcessMs_ = timer.elapsed();
+    if (!videoEffectStackUsesGpu() && !effectStack_.empty()) {
+        const double fps = videoService_ ? videoService_->fps() : 30.0;
+        const qint64 budgetMs = std::max<qint64>(1, static_cast<qint64>(1000.0 / std::max(1.0, fps)));
+        dropNextCpuFrame_ = lastFrameProcessMs_ > budgetMs;
+    } else {
+        dropNextCpuFrame_ = false;
+    }
+
     ++outImageVersion_;
     emit imageChanged();
     if (wasEmpty) {

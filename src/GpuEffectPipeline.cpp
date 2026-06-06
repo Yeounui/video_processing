@@ -71,6 +71,7 @@ in vec2 v_uv;
 out vec4 fragColor;
 void main() {
     vec4 texel = texture(u_tex, v_uv);
+    if (texel.a <= 0.0) { fragColor = vec4(0.0); return; }
     vec3 rgb = texel.rgb;
     rgb = clamp(rgb + vec3(u_amount / 255.0), 0.0, 1.0);
     fragColor = vec4(rgb, texel.a);
@@ -88,6 +89,7 @@ in vec2 v_uv;
 out vec4 fragColor;
 void main() {
     vec4 texel = texture(u_tex, v_uv);
+    if (texel.a <= 0.0) { fragColor = vec4(0.0); return; }
     vec3 rgb = texel.rgb;
     rgb = clamp(rgb * u_factor, 0.0, 1.0);
     fragColor = vec4(rgb, texel.a);
@@ -105,6 +107,7 @@ in vec2 v_uv;
 out vec4 fragColor;
 void main() {
     vec4 texel = texture(u_tex, v_uv);
+    if (texel.a <= 0.0) { fragColor = vec4(0.0); return; }
     vec3 rgb = texel.rgb;
     rgb = pow(clamp(rgb, 1e-6, 1.0), vec3(u_gamma));
     fragColor = vec4(rgb, texel.a);
@@ -122,6 +125,7 @@ in vec2 v_uv;
 out vec4 fragColor;
 void main() {
     vec4 texel = texture(u_tex, v_uv);
+    if (texel.a <= 0.0) { fragColor = vec4(0.0); return; }
     vec3 rgb = texel.rgb;
     float luma = dot(rgb, vec3(0.299, 0.587, 0.114));
     float v = luma >= u_threshold ? 1.0 : 0.0;
@@ -140,6 +144,7 @@ in vec2 v_uv;
 out vec4 fragColor;
 void main() {
     vec4 texel = texture(u_tex, v_uv);
+    if (texel.a <= 0.0) { fragColor = vec4(0.0); return; }
     uvec3 ci = uvec3(round(texel.rgb * 255.0));
     ci = ci & uvec3(u_mask);
     fragColor = vec4(vec3(ci) / 255.0, texel.a);
@@ -160,7 +165,8 @@ void main() {
     vec2 uv = v_uv;
     if (u_flipH > 0) uv.x = 1.0 - uv.x;
     if (u_flipV > 0) uv.y = 1.0 - uv.y;
-    fragColor = texture(u_tex, uv);
+    vec4 texel = texture(u_tex, uv);
+    fragColor = texel.a <= 0.0 ? vec4(0.0) : texel;
 }
 )glsl";
         return src;
@@ -175,6 +181,7 @@ out vec4 fragColor;
 void main() {
     vec2 s = u_invSize;
     float alpha = texture(u_tex, v_uv).a;
+    if (alpha <= 0.0) { fragColor = vec4(0.0); return; }
     vec3 color = vec3(0.5);
     color += -2.0*texture(u_tex, v_uv+vec2(-s.x,-s.y)).rgb;
     color += -1.0*texture(u_tex, v_uv+vec2( 0.0,-s.y)).rgb;
@@ -196,6 +203,7 @@ in vec2 v_uv;
 out vec4 fragColor;
 void main() {
     float alpha = texture(u_tex, v_uv).a;
+    if (alpha <= 0.0) { fragColor = vec4(0.0); return; }
     vec3 color = vec3(0.0);
     for (int dy=-1; dy<=1; dy++)
         for (int dx=-1; dx<=1; dx++)
@@ -214,6 +222,7 @@ in vec2 v_uv;
 out vec4 fragColor;
 void main() {
     float alpha = texture(u_tex, v_uv).a;
+    if (alpha <= 0.0) { fragColor = vec4(0.0); return; }
     vec3 color = vec3(0.0);
     for (int dy=-2; dy<=2; dy++)
         for (int dx=-2; dx<=2; dx++)
@@ -234,6 +243,7 @@ out vec4 fragColor;
 void main() {
     float a = u_amount;
     vec4 texel = texture(u_tex, v_uv);
+    if (texel.a <= 0.0) { fragColor = vec4(0.0); return; }
     vec3 color = (1.0+4.0*a)*texel.rgb
         -a*texture(u_tex, v_uv+vec2(0.0, u_invSize.y)).rgb
         -a*texture(u_tex, v_uv-vec2(0.0, u_invSize.y)).rgb
@@ -254,6 +264,7 @@ out vec4 fragColor;
 void main() {
     vec2 s = u_invSize;
     float alpha = texture(u_tex, v_uv).a;
+    if (alpha <= 0.0) { fragColor = vec4(0.0); return; }
     vec3 gx = -1.0*texture(u_tex,v_uv+vec2(-s.x,-s.y)).rgb
         -2.0*texture(u_tex,v_uv+vec2(-s.x, 0.0)).rgb
         -1.0*texture(u_tex,v_uv+vec2(-s.x, s.y)).rgb
@@ -275,6 +286,7 @@ out vec4 fragColor;
 void main() {
     vec2 s = u_invSize;
     float alpha = texture(u_tex, v_uv).a;
+    if (alpha <= 0.0) { fragColor = vec4(0.0); return; }
     vec3 gy = -1.0*texture(u_tex,v_uv+vec2(-s.x,-s.y)).rgb
         -2.0*texture(u_tex,v_uv+vec2( 0.0,-s.y)).rgb
         -1.0*texture(u_tex,v_uv+vec2( s.x,-s.y)).rgb
@@ -296,6 +308,7 @@ out vec4 fragColor;
 void main() {
     vec2 s = u_invSize;
     vec4 texel = texture(u_tex, v_uv);
+    if (texel.a <= 0.0) { fragColor = vec4(0.0); return; }
     vec3 c = texel.rgb;
     vec3 lap = 4.0*c
         - texture(u_tex,v_uv+vec2(0.0,s.y)).rgb
@@ -316,6 +329,7 @@ in vec2 v_uv;
 out vec4 fragColor;
 void main() {
     vec4 texel = texture(u_tex, v_uv);
+    if (texel.a <= 0.0) { fragColor = vec4(0.0); return; }
     vec3 rgb = texel.rgb;
     float g = (rgb.r + rgb.g + rgb.b) / 3.0;
     fragColor = vec4(vec3(g), texel.a);
@@ -332,6 +346,7 @@ in vec2 v_uv;
 out vec4 fragColor;
 void main() {
     vec4 texel = texture(u_tex, v_uv);
+    if (texel.a <= 0.0) { fragColor = vec4(0.0); return; }
     vec3 rgb = texel.rgb;
     float g = dot(rgb, vec3(0.2126, 0.7152, 0.0722));
     fragColor = vec4(vec3(g), texel.a);
@@ -348,6 +363,7 @@ in vec2 v_uv;
 out vec4 fragColor;
 void main() {
     vec4 texel = texture(u_tex, v_uv);
+    if (texel.a <= 0.0) { fragColor = vec4(0.0); return; }
     vec3 rgb = texel.rgb;
     float g = (max(rgb.r, max(rgb.g, rgb.b)) + min(rgb.r, min(rgb.g, rgb.b))) * 0.5;
     fragColor = vec4(vec3(g), texel.a);
@@ -360,6 +376,63 @@ void main() {
     }
 }
 
+const char *GpuEffectPipeline::fusedFragmentSource() {
+    static const char *src = R"glsl(
+#version 330 core
+uniform sampler2D u_tex;
+uniform vec2 u_invSize;
+uniform int u_count;
+uniform int u_alg[3];
+uniform float u_value[3];
+uniform int u_flipH[3];
+uniform int u_flipV[3];
+in vec2 v_uv;
+out vec4 fragColor;
+void main() {
+    vec2 uv = v_uv;
+    for (int i = 0; i < u_count; ++i) {
+        if (u_alg[i] == 7) {
+            if (u_flipH[i] > 0) uv.x = 1.0 - uv.x;
+            if (u_flipV[i] > 0) uv.y = 1.0 - uv.y;
+        }
+    }
+
+    vec4 color = texture(u_tex, uv);
+    if (color.a <= 0.0) {
+        fragColor = vec4(0.0);
+        return;
+    }
+
+    for (int i = 0; i < u_count; ++i) {
+        int alg = u_alg[i];
+        if (alg == 1) {
+            color.rgb = clamp(color.rgb + vec3(u_value[i] / 255.0), 0.0, 1.0);
+        } else if (alg == 2) {
+            color.rgb = clamp(color.rgb * u_value[i], 0.0, 1.0);
+        } else if (alg == 3) {
+            color.rgb = pow(clamp(color.rgb, 1e-6, 1.0), vec3(u_value[i]));
+        } else if (alg == 4) {
+            float luma = dot(color.rgb, vec3(0.299, 0.587, 0.114));
+            float v = luma >= u_value[i] ? 1.0 : 0.0;
+            color.rgb = vec3(v);
+        } else if (alg == 26) {
+            float g = (color.r + color.g + color.b) / 3.0;
+            color.rgb = vec3(g);
+        } else if (alg == 27) {
+            float g = dot(color.rgb, vec3(0.2126, 0.7152, 0.0722));
+            color.rgb = vec3(g);
+        } else if (alg == 28) {
+            float g = (max(color.r, max(color.g, color.b)) + min(color.r, min(color.g, color.b))) * 0.5;
+            color.rgb = vec3(g);
+        }
+    }
+
+    fragColor = color;
+}
+)glsl";
+    return src;
+}
+
 // ============================================================================
 // Public Interface
 // ============================================================================
@@ -370,6 +443,27 @@ bool GpuEffectPipeline::supportsAlgorithm(int algorithmId) {
         if (s == algorithmId) return true;
     }
     return false;
+}
+
+bool GpuEffectPipeline::supportsFusedAlgorithm(int algorithmId) {
+    static const int supported[] = {1, 2, 3, 4, 7, 26, 27, 28};
+    for (int s : supported) {
+        if (s == algorithmId) return true;
+    }
+    return false;
+}
+
+bool GpuEffectPipeline::supportsFusedStack(const std::vector<GpuEffectCommand> &effects) {
+    if (effects.empty() || effects.size() > 3) {
+        return false;
+    }
+
+    for (const auto &effect : effects) {
+        if (!supportsFusedAlgorithm(effect.algorithmId)) {
+            return false;
+        }
+    }
+    return true;
 }
 
 bool GpuEffectPipeline::initialize() {
@@ -405,14 +499,17 @@ void GpuEffectPipeline::destroy() {
         if (prog.id) gl_.glDeleteProgram(prog.id);
     }
     programs_.clear();
+    if (fusedProgram_.id) gl_.glDeleteProgram(fusedProgram_.id);
+    fusedProgram_ = {};
 
     if (fbo_) gl_.glDeleteFramebuffers(1, &fbo_);
     if (srcTex_) gl_.glDeleteTextures(1, &srcTex_);
     if (dstTex_) gl_.glDeleteTextures(1, &dstTex_);
+    if (auxTex_) gl_.glDeleteTextures(1, &auxTex_);
     if (vbo_) gl_.glDeleteBuffers(1, &vbo_);
     if (vao_) gl_.glDeleteVertexArrays(1, &vao_);
 
-    fbo_ = srcTex_ = dstTex_ = vbo_ = vao_ = 0;
+    fbo_ = srcTex_ = dstTex_ = auxTex_ = vbo_ = vao_ = 0;
     cachedW_ = cachedH_ = 0;
     initialized_ = false;
 }
@@ -442,12 +539,14 @@ std::shared_ptr<ImageBuffer> GpuEffectPipeline::applyStaticEffect(
 
     // Bind FBO and render
     gl_.glBindFramebuffer(GL_FRAMEBUFFER, fbo_);
+    gl_.glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
+                               GL_TEXTURE_2D, dstTex_, 0);
     gl_.glViewport(0, 0, src.width, src.height);
     gl_.glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     gl_.glClear(GL_COLOR_BUFFER_BIT);
 
     gl_.glUseProgram(prog);
-    setUniforms(prog, algorithmId, params, src.width, src.height);
+    setUniforms(prog, algorithmId, params, src.width, src.height, srcTex_);
 
     gl_.glBindVertexArray(vao_);
     gl_.glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
@@ -456,6 +555,60 @@ std::shared_ptr<ImageBuffer> GpuEffectPipeline::applyStaticEffect(
     gl_.glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
     return readback(src.width, src.height, src.channels);
+}
+
+GLuint GpuEffectPipeline::applyEffectStackToTexture(
+    const ImageBuffer &src, const std::vector<GpuEffectCommand> &effects)
+{
+    if (effects.empty()) {
+        return 0;
+    }
+
+    if (!initialize()) {
+        qWarning() << "GpuEffectPipeline: Failed to initialize";
+        return 0;
+    }
+
+    ScopedGpuEffectState restore(gl_);
+
+    if (!ensureTextures(src.width, src.height)) {
+        qWarning() << "GpuEffectPipeline: Failed to ensure textures";
+        return 0;
+    }
+
+    uploadSrc(src);
+
+    if (supportsFusedStack(effects)) {
+        GLuint prog = getOrCompileFusedProgram();
+        if (!prog) {
+            qWarning() << "GpuEffectPipeline: Failed to get/compile fused shader";
+            return 0;
+        }
+        gl_.glUseProgram(prog);
+        setFusedUniforms(prog, effects, src.width, src.height, srcTex_);
+        drawFullscreen(prog, src.width, src.height, dstTex_);
+        return dstTex_;
+    }
+
+    GLuint inputTex = srcTex_;
+    GLuint outputTex = 0;
+    for (std::size_t i = 0; i < effects.size(); ++i) {
+        const auto &effect = effects[i];
+        GLuint prog = getOrCompileProgram(effect.algorithmId);
+        if (!prog) {
+            qWarning() << "GpuEffectPipeline: Failed to get/compile shader for algorithm"
+                       << effect.algorithmId;
+            return 0;
+        }
+
+        outputTex = (i % 2 == 0) ? dstTex_ : auxTex_;
+        gl_.glUseProgram(prog);
+        setUniforms(prog, effect.algorithmId, effect.params, src.width, src.height, inputTex);
+        drawFullscreen(prog, src.width, src.height, outputTex);
+        inputTex = outputTex;
+    }
+
+    return outputTex;
 }
 
 // ============================================================================
@@ -468,26 +621,23 @@ bool GpuEffectPipeline::ensureTextures(int w, int h) {
         if (fbo_) gl_.glDeleteFramebuffers(1, &fbo_);
         if (srcTex_) gl_.glDeleteTextures(1, &srcTex_);
         if (dstTex_) gl_.glDeleteTextures(1, &dstTex_);
+        if (auxTex_) gl_.glDeleteTextures(1, &auxTex_);
 
-        fbo_ = srcTex_ = dstTex_ = 0;
+        fbo_ = srcTex_ = dstTex_ = auxTex_ = 0;
 
-        // Create source texture (GL_RGBA8)
-        gl_.glGenTextures(1, &srcTex_);
-        gl_.glBindTexture(GL_TEXTURE_2D, srcTex_);
-        gl_.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-        gl_.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-        gl_.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-        gl_.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-        gl_.glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
-
-        // Create destination texture (GL_RGBA8)
-        gl_.glGenTextures(1, &dstTex_);
-        gl_.glBindTexture(GL_TEXTURE_2D, dstTex_);
-        gl_.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-        gl_.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-        gl_.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-        gl_.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-        gl_.glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+        auto createTexture = [&](GLuint &tex) {
+            gl_.glGenTextures(1, &tex);
+            gl_.glBindTexture(GL_TEXTURE_2D, tex);
+            gl_.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+            gl_.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+            gl_.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+            gl_.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+            gl_.glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, w, h, 0,
+                             GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+        };
+        createTexture(srcTex_);
+        createTexture(dstTex_);
+        createTexture(auxTex_);
 
         // Create FBO and attach destination texture
         gl_.glGenFramebuffers(1, &fbo_);
@@ -528,6 +678,22 @@ void GpuEffectPipeline::uploadSrc(const ImageBuffer &src) {
         gl_.glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, src.width, src.height,
                             GL_RGBA, GL_UNSIGNED_BYTE, rgbaData.data());
     }
+}
+
+void GpuEffectPipeline::drawFullscreen(GLuint prog, int w, int h, GLuint targetTex) {
+    gl_.glBindFramebuffer(GL_FRAMEBUFFER, fbo_);
+    gl_.glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
+                               GL_TEXTURE_2D, targetTex, 0);
+    gl_.glViewport(0, 0, w, h);
+    gl_.glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+    gl_.glClear(GL_COLOR_BUFFER_BIT);
+
+    gl_.glUseProgram(prog);
+    gl_.glBindVertexArray(vao_);
+    gl_.glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+    gl_.glBindVertexArray(0);
+
+    gl_.glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
 std::shared_ptr<ImageBuffer> GpuEffectPipeline::readback(int w, int h, int channels) {
@@ -609,7 +775,66 @@ GLuint GpuEffectPipeline::getOrCompileProgram(int algorithmId) {
     return prog;
 }
 
-void GpuEffectPipeline::setUniforms(GLuint prog, int algorithmId, const QVariantMap &params, int w, int h) {
+GLuint GpuEffectPipeline::getOrCompileFusedProgram() {
+    if (fusedProgram_.id || fusedProgram_.failed) {
+        return fusedProgram_.failed ? 0 : fusedProgram_.id;
+    }
+
+    auto compileShader = [&](GLenum type, const char *src) -> GLuint {
+        GLuint s = gl_.glCreateShader(type);
+        gl_.glShaderSource(s, 1, &src, nullptr);
+        gl_.glCompileShader(s);
+        GLint ok = 0;
+        gl_.glGetShaderiv(s, GL_COMPILE_STATUS, &ok);
+        if (!ok) {
+            GLint len = 0;
+            gl_.glGetShaderiv(s, GL_INFO_LOG_LENGTH, &len);
+            QByteArray log(len, '\0');
+            gl_.glGetShaderInfoLog(s, len, nullptr, log.data());
+            qWarning() << "GpuEffectPipeline: fused shader compile failed (type"
+                       << type << "):" << log;
+            gl_.glDeleteShader(s);
+            return 0;
+        }
+        return s;
+    };
+
+    GLuint vs = compileShader(GL_VERTEX_SHADER, vertShaderSrc);
+    if (!vs) { fusedProgram_.failed = true; return 0; }
+
+    GLuint fs = compileShader(GL_FRAGMENT_SHADER, fusedFragmentSource());
+    if (!fs) {
+        gl_.glDeleteShader(vs);
+        fusedProgram_.failed = true;
+        return 0;
+    }
+
+    GLuint prog = gl_.glCreateProgram();
+    gl_.glAttachShader(prog, vs);
+    gl_.glAttachShader(prog, fs);
+    gl_.glLinkProgram(prog);
+    gl_.glDeleteShader(vs);
+    gl_.glDeleteShader(fs);
+
+    GLint linked = 0;
+    gl_.glGetProgramiv(prog, GL_LINK_STATUS, &linked);
+    if (!linked) {
+        GLint len = 0;
+        gl_.glGetProgramiv(prog, GL_INFO_LOG_LENGTH, &len);
+        QByteArray log(len, '\0');
+        gl_.glGetProgramInfoLog(prog, len, nullptr, log.data());
+        qWarning() << "GpuEffectPipeline: fused shader link failed:" << log;
+        gl_.glDeleteProgram(prog);
+        fusedProgram_.failed = true;
+        return 0;
+    }
+
+    fusedProgram_ = Program{prog, false};
+    return prog;
+}
+
+void GpuEffectPipeline::setUniforms(GLuint prog, int algorithmId, const QVariantMap &params,
+                                    int w, int h, GLuint inputTex) {
     gl_.glUseProgram(prog);
 
     // Always set u_tex (location 0) and u_invSize
@@ -618,7 +843,7 @@ void GpuEffectPipeline::setUniforms(GLuint prog, int algorithmId, const QVariant
         gl_.glUniform1i(texLoc, 0);
     }
     gl_.glActiveTexture(GL_TEXTURE0);
-    gl_.glBindTexture(GL_TEXTURE_2D, srcTex_);
+    gl_.glBindTexture(GL_TEXTURE_2D, inputTex);
 
     GLint invSizeLoc = gl_.glGetUniformLocation(prog, "u_invSize");
     if (invSizeLoc >= 0) {
@@ -632,7 +857,7 @@ void GpuEffectPipeline::setUniforms(GLuint prog, int algorithmId, const QVariant
     case 1: {  // Brightness
         GLint amountLoc = gl_.glGetUniformLocation(prog, "u_amount");
         if (amountLoc >= 0) {
-            float amount = params.value("amount", 0.0f).toFloat();
+            float amount = params.value("delta", params.value("amount", 0.0f)).toFloat();
             gl_.glUniform1f(amountLoc, amount);
         }
         break;
@@ -689,7 +914,7 @@ void GpuEffectPipeline::setUniforms(GLuint prog, int algorithmId, const QVariant
     case 14: {  // Sharpen
         GLint amountLoc = gl_.glGetUniformLocation(prog, "u_amount");
         if (amountLoc >= 0) {
-            float amount = params.value("amount", 0.5f).toFloat();
+            float amount = params.value("alpha", params.value("amount", 0.5f)).toFloat();
             gl_.glUniform1f(amountLoc, amount);
         }
         break;
@@ -697,4 +922,71 @@ void GpuEffectPipeline::setUniforms(GLuint prog, int algorithmId, const QVariant
     default:
         break;
     }
+}
+
+void GpuEffectPipeline::setFusedUniforms(
+    GLuint prog, const std::vector<GpuEffectCommand> &effects, int w, int h, GLuint inputTex)
+{
+    gl_.glUseProgram(prog);
+
+    GLint texLoc = gl_.glGetUniformLocation(prog, "u_tex");
+    if (texLoc >= 0) {
+        gl_.glUniform1i(texLoc, 0);
+    }
+    gl_.glActiveTexture(GL_TEXTURE0);
+    gl_.glBindTexture(GL_TEXTURE_2D, inputTex);
+
+    GLint invSizeLoc = gl_.glGetUniformLocation(prog, "u_invSize");
+    if (invSizeLoc >= 0) {
+        gl_.glUniform2f(invSizeLoc, 1.0f / w, 1.0f / h);
+    }
+
+    int alg[3] = {0, 0, 0};
+    int flipH[3] = {0, 0, 0};
+    int flipV[3] = {0, 0, 0};
+    float value[3] = {0.0f, 0.0f, 0.0f};
+
+    const int count = std::min<int>(static_cast<int>(effects.size()), 3);
+    for (int i = 0; i < count; ++i) {
+        const auto &effect = effects[static_cast<std::size_t>(i)];
+        const QVariantMap &params = effect.params;
+        alg[i] = effect.algorithmId;
+
+        switch (effect.algorithmId) {
+        case 1:
+            value[i] = params.value(QStringLiteral("delta"),
+                                    params.value(QStringLiteral("amount"), 0.0f)).toFloat();
+            break;
+        case 2:
+            value[i] = params.value(QStringLiteral("factor"), 1.0f).toFloat();
+            break;
+        case 3:
+            value[i] = params.value(QStringLiteral("gamma"), 1.0f).toFloat();
+            break;
+        case 4:
+            value[i] = params.value(QStringLiteral("threshold"), 128).toFloat() / 255.0f;
+            break;
+        case 7: {
+            const QString mode = params.value(QStringLiteral("mode"), QStringLiteral("H")).toString();
+            flipH[i] = (mode == QStringLiteral("H") || mode == QStringLiteral("Both")
+                        || params.value(QStringLiteral("horizontal"), false).toBool()) ? 1 : 0;
+            flipV[i] = (mode == QStringLiteral("V") || mode == QStringLiteral("Both")
+                        || params.value(QStringLiteral("vertical"), false).toBool()) ? 1 : 0;
+            break;
+        }
+        default:
+            break;
+        }
+    }
+
+    GLint countLoc = gl_.glGetUniformLocation(prog, "u_count");
+    if (countLoc >= 0) gl_.glUniform1i(countLoc, count);
+    GLint algLoc = gl_.glGetUniformLocation(prog, "u_alg");
+    if (algLoc >= 0) gl_.glUniform1iv(algLoc, 3, alg);
+    GLint valueLoc = gl_.glGetUniformLocation(prog, "u_value");
+    if (valueLoc >= 0) gl_.glUniform1fv(valueLoc, 3, value);
+    GLint flipHLoc = gl_.glGetUniformLocation(prog, "u_flipH");
+    if (flipHLoc >= 0) gl_.glUniform1iv(flipHLoc, 3, flipH);
+    GLint flipVLoc = gl_.glGetUniformLocation(prog, "u_flipV");
+    if (flipVLoc >= 0) gl_.glUniform1iv(flipVLoc, 3, flipV);
 }

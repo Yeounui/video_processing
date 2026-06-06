@@ -225,6 +225,8 @@ struct Snapshot {
     float   panOffsetY    = 0.0f;
     QQuickWindow *window  = nullptr;  // for beginExternalCommands()
     PendingGpuCommand pendingGpuCmd;
+    bool videoGpuEffectsEnabled = false;
+    std::vector<GpuEffectCommand> videoGpuEffects;
 };
 
 // ============================================================================
@@ -404,8 +406,21 @@ void ViewportRenderNode::render(const RenderState *state) {
         uploadedVer = newVer;
     };
 
-    uploadTex(texOut_, pending_.outImage, uploadedOutVer_, pending_.outVer);
     uploadTex(texIn_,  pending_.inImage,  uploadedInVer_,  pending_.inVer);
+
+    GLuint displayOutTex = texOut_;
+    if (pending_.videoGpuEffectsEnabled && pending_.outImage) {
+        GLuint gpuTex = gpuPipeline_.applyEffectStackToTexture(*pending_.outImage,
+                                                               pending_.videoGpuEffects);
+        if (gpuTex != 0) {
+            displayOutTex = gpuTex;
+            uploadedOutVer_ = std::numeric_limits<quint64>::max();
+        }
+    }
+
+    if (displayOutTex == texOut_) {
+        uploadTex(texOut_, pending_.outImage, uploadedOutVer_, pending_.outVer);
+    }
 
     // Update quad VBO if viewport size changed
     float vw = (float)pending_.viewSize.width();
@@ -451,7 +466,7 @@ void ViewportRenderNode::render(const RenderState *state) {
     shader_->setUniformValue("u_bgColor", bgColor);
 
     gl_.glActiveTexture(GL_TEXTURE0);
-    gl_.glBindTexture(GL_TEXTURE_2D, texOut_);
+    gl_.glBindTexture(GL_TEXTURE_2D, displayOutTex);
     shader_->setUniformValue("u_texOut", 0);
 
     gl_.glActiveTexture(GL_TEXTURE1);
@@ -627,6 +642,14 @@ QSGNode *ProcessingViewportItem::updatePaintNode(QSGNode *old, UpdatePaintNodeDa
     snap.panOffsetX    = (float)panOffsetX_;
     snap.panOffsetY    = (float)panOffsetY_;
     snap.window        = window();
+    snap.videoGpuEffectsEnabled = controller_->videoEffectStackUsesGpu();
+    if (snap.videoGpuEffectsEnabled) {
+        const auto &effects = controller_->effectStack();
+        snap.videoGpuEffects.reserve(effects.size());
+        for (const auto &effect : effects) {
+            snap.videoGpuEffects.push_back({effect.algorithmId, effect.params});
+        }
+    }
 
     // Transfer pending GPU command to snapshot
     if (pendingGpuCmd_.valid) {

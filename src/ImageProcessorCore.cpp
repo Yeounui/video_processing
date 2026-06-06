@@ -45,6 +45,19 @@ inline void resizeDst(const ImageBuffer& src, ImageBuffer& dst) {
     }
 }
 
+inline void clearTransparentRgb(ImageBuffer& img) {
+    if (img.channels < 4)
+        return;
+
+    for (int y = 0; y < img.height; ++y)
+        for (int x = 0; x < img.width; ++x)
+            if (px(img, x, y, 3) == 0) {
+                setPx(img, x, y, 0, 0);
+                setPx(img, x, y, 1, 0);
+                setPx(img, x, y, 2, 0);
+            }
+}
+
 // 1D Gaussian kernel (normalized), size must be odd
 static std::vector<double> makeGaussian1D(int size, double sigma) {
     std::vector<double> k(size);
@@ -676,6 +689,7 @@ bool ImageProcessorCore::apply(const ImageBuffer& src, ImageBuffer& dst,
     }
     }
 
+    clearTransparentRgb(dst);
     return true;
 }
 
