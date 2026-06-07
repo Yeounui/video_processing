@@ -237,6 +237,32 @@ quint64 ProcessingController::outImageVersion() const
     return outImageVersion_;
 }
 
+ProcessingBackend::Kind ProcessingController::acceleratedBackendKind() const
+{
+    return acceleratedBackendKind_;
+}
+
+void ProcessingController::setAcceleratedBackendKind(ProcessingBackend::Kind kind)
+{
+    if (acceleratedBackendKind_ == kind) {
+        return;
+    }
+
+    clearGpuApplyState();
+    acceleratedBackendKind_ = kind;
+    dropNextCpuFrame_ = false;
+
+    emit effectStackChanged();
+
+    if ((sourceType_ == SourceType::SOURCE_VIDEO_FILE
+         || sourceType_ == SourceType::SOURCE_REALTIME_STREAM)
+        && inImage_) {
+        outImage_ = applyEffectStack(inImage_);
+        ++outImageVersion_;
+        emit imageChanged();
+    }
+}
+
 void ProcessingController::setOutImageDirect(std::shared_ptr<ImageBuffer> img)
 {
     if (gpuApplyPending_) {
@@ -474,7 +500,7 @@ void ProcessingController::applyAlgorithm(int algorithmId, const QVariantMap &pa
     mutableParams = paramsWithCpuStatistics(*outImage_, algorithmId, std::move(mutableParams));
 
     // Check if GPU path is available for this algorithm
-    if (ProcessingBackend::supportsAcceleratedAlgorithm(algorithmId)) {
+    if (ProcessingBackend::supportsAcceleratedAlgorithm(algorithmId, acceleratedBackendKind_)) {
         gpuPrevOut_ = outImage_;
         gpuPendingLabel_ = algorithmLabel(algorithmId);
         gpuPendingAlgorithmId_ = algorithmId;
@@ -601,7 +627,8 @@ int ProcessingController::videoGpuSuffixStartIndex() const
         return static_cast<int>(effectStack_.size());
     }
 
-    return ProcessingBackend::planVideoStack(toBackendEffects(effectStack_)).cpuPrefixCount;
+    return ProcessingBackend::planVideoStack(
+        toBackendEffects(effectStack_), acceleratedBackendKind_).cpuPrefixCount;
 }
 
 void ProcessingController::commitGpuResult(std::shared_ptr<ImageBuffer> result)

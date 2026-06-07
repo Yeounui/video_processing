@@ -2,6 +2,7 @@
 
 #include "EditCommand.h"
 #include "ImageBuffer.h"
+#include "ProcessingBackend.h"
 #include "VideoInputService.h"
 #include <deque>
 #include <vector>
@@ -70,6 +71,8 @@ public:
     quint64 outImageVersion() const;
     void setOutImageDirect(std::shared_ptr<ImageBuffer> img);
     const std::vector<EffectEntry> &effectStack() const { return effectStack_; }
+    ProcessingBackend::Kind acceleratedBackendKind() const;
+    void setAcceleratedBackendKind(ProcessingBackend::Kind kind);
     bool videoEffectStackUsesGpu() const;
     std::vector<EffectEntry> videoGpuEffectSuffix() const;
 
@@ -170,4 +173,5 @@ private:
     bool nextCpuScratchA_ = true;
     qint64 lastFrameProcessMs_ = 0;
     bool dropNextCpuFrame_ = false;
+    ProcessingBackend::Kind acceleratedBackendKind_ = ProcessingBackend::Kind::OpenGl;
 };

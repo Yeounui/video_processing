@@ -67,6 +67,10 @@ requirements.
   source/output changed before completion.
 - Static-image accelerated failures fall back to the CPU reference path when
   the pending request still matches the current output image.
+- `ProcessingController` can now be switched to
+  `ProcessingBackend::Kind::CpuReference` through a non-QML API. In that mode,
+  GPU-supported static algorithms apply synchronously through the CPU reference
+  path and video stacks produce no accelerated suffix.
 - Plan documents are intended to be tracked through the `.gitignore`
   exception for `plan/*.md`.
 
@@ -116,6 +120,12 @@ requirements.
   when the request is still current. `.codex/hooks/run-in-conda.sh cmake
   --build build` and `.codex/hooks/run-in-conda.sh ctest --test-dir build
   --output-on-failure` passed after the change.
+- 2026-06-07: Controller-level backend selection was added for the CPU
+  reference path. `tst_ProcessingController` covers CPU-reference planning with
+  no accelerated suffix and static CPU-only apply for a GPU-supported
+  algorithm. `.codex/hooks/run-in-conda.sh cmake --build build` and
+  `.codex/hooks/run-in-conda.sh ctest --test-dir build --output-on-failure`
+  passed after the change.
 
 ## Source Evidence
 
@@ -141,5 +151,7 @@ requirements.
   satisfy stream timeout, reconnect, or metadata requirements?
 - Which OpenCV acceleration profile is expected in the target environment:
   CPU-only, OpenCL/UMat, CUDA, or multiple runtime-selectable backends?
+- Should backend selection become a user-visible setting, an environment
+  override, or an automatic runtime capability decision?
 - What are the target performance budgets for static images, video files, and
   real-time streams?

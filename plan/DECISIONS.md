@@ -297,3 +297,20 @@ Consequence: source/output mutations invalidate pending accelerated work.
 Accelerated failure falls back to `ImageProcessorCore::apply()` only when the
 pending request is still current; stale completions and stale failures are
 discarded without changing the new source or appending history.
+
+## D-020: Make CPU Reference A Selectable Backend
+
+Status: verified
+
+Decision: `ProcessingController` owns a selected `ProcessingBackend::Kind`, and
+`ProcessingBackend::Kind::CpuReference` is a valid non-QML selection.
+
+Reason: Phase 5 requires CPU-only machines to run without corrupting state or
+depending on OpenGL accelerated execution. The CPU path also needs to be
+testable independently from runtime OpenGL availability.
+
+Consequence: static-image apply checks accelerated support against the selected
+backend before emitting GPU work. Video stack planning uses the same selection,
+so CPU-reference mode produces a full CPU prefix and no accelerated suffix.
+Changing the backend clears pending accelerated work and re-applies the current
+video frame through the newly selected planning path.

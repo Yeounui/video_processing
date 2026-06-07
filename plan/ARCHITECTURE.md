@@ -209,6 +209,9 @@ Current implementation note:
   `ProcessingBackend`.
 - `ProcessingController` depends on backend planning for video suffix splitting
   and no longer queries the OpenGL pipeline directly for stack boundaries.
+- `ProcessingController` owns the currently selected accelerated backend kind.
+  `CpuReference` is a valid selection and forces static apply plus video stack
+  planning through the CPU reference path without emitting GPU work.
 
 ## Video Source Spec
 

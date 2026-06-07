@@ -143,6 +143,11 @@ Current automated coverage:
   apply the same algorithm through the CPU reference path with normal history.
 - Static-image stale GPU completion is simulated after opening a different
   source and must not overwrite the new source or append history.
+- CPU-reference backend selection is simulated through the controller API and
+  must bypass static accelerated dispatch for algorithms that the OpenGL path
+  otherwise supports.
+- CPU-reference video-stack planning must produce a full CPU prefix and no
+  accelerated suffix.
 
 ## Manual QA
 

@@ -202,8 +202,11 @@ Implementation note:
   still current, the controller applies the same algorithm and CPU-computed
   parameters through the CPU reference implementation, records normal history,
   and leaves the image unchanged only if the CPU fallback also fails.
+- `ProcessingController` has an explicit non-QML backend selector. Selecting
+  `ProcessingBackend::Kind::CpuReference` disables static accelerated dispatch
+  and makes video stack planning apply the full stack in the CPU prefix.
 - Phase 5 is not fully verified yet because runtime backend selection,
-  runtime capability detection, and CPU-only startup coverage still need
+  runtime capability detection, and full CPU-only startup coverage still need
   explicit acceptance tests.
 
 ## Phase 6: Remove Replaced Dependencies
