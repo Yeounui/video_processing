@@ -415,6 +415,11 @@ void ViewportRenderNode::render(const RenderState *state) {
         if (gpuTex != 0) {
             displayOutTex = gpuTex;
             uploadedOutVer_ = std::numeric_limits<quint64>::max();
+        } else if (callbackItem_) {
+            ProcessingViewportItem *cb = callbackItem_;
+            QMetaObject::invokeMethod(cb, [cb]() {
+                cb->notifyGpuPipelineFailure();
+            }, Qt::QueuedConnection);
         }
     }
 
@@ -758,4 +763,10 @@ void ProcessingViewportItem::deliverGpuResult(bool ok, std::shared_ptr<ImageBuff
     } else {
         controller_->cancelGpuApply();
     }
+}
+
+void ProcessingViewportItem::notifyGpuPipelineFailure()
+{
+    if (!controller_) return;
+    controller_->markAcceleratedBackendUnavailable();
 }

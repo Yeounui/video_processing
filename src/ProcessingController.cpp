@@ -263,6 +263,11 @@ void ProcessingController::setAcceleratedBackendKind(ProcessingBackend::Kind kin
     }
 }
 
+void ProcessingController::markAcceleratedBackendUnavailable()
+{
+    setAcceleratedBackendKind(ProcessingBackend::Kind::CpuReference);
+}
+
 void ProcessingController::setOutImageDirect(std::shared_ptr<ImageBuffer> img)
 {
     if (gpuApplyPending_) {
@@ -677,6 +682,7 @@ void ProcessingController::cancelGpuApply()
 
     auto scratch = std::make_shared<ImageBuffer>();
     if (prevOut && ImageProcessorCore::apply(*prevOut, *scratch, algorithmId, params)) {
+        markAcceleratedBackendUnavailable();
         pushCommand(std::make_unique<StaticApplyCommand>(this, prevOut, scratch, label), label);
         outImage_ = scratch;
         ++outImageVersion_;
@@ -686,6 +692,7 @@ void ProcessingController::cancelGpuApply()
         return;
     }
 
+    markAcceleratedBackendUnavailable();
     emit errorOccurred(QStringLiteral("GPU effect failed; result unchanged"));
 }
 

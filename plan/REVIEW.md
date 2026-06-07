@@ -85,8 +85,9 @@ Current automated coverage:
   and statistics-dependent CPU-only algorithms, the current fused GPU support
   matrix, CPU effect-stack statistics computed from the current source image
   rather than the default statistic values, CPU fallback after static-image
-  accelerated failure, and stale accelerated-result rejection after source
-  changes.
+  accelerated failure, accelerated-backend downgrade to `CpuReference` after
+  failure, later CPU-only apply for GPU-supported algorithms, and stale
+  accelerated-result rejection after source changes.
 
 ## Video And Stream Acceptance
 
@@ -140,7 +141,9 @@ Acceleration review must cover:
 Current automated coverage:
 
 - Static-image GPU failure is simulated through the controller API and must
-  apply the same algorithm through the CPU reference path with normal history.
+  apply the same algorithm through the CPU reference path with normal history,
+  downgrade the selected backend to `CpuReference`, and keep later
+  GPU-supported algorithms on the CPU reference path.
 - Static-image stale GPU completion is simulated after opening a different
   source and must not overwrite the new source or append history.
 - CPU-reference backend selection is simulated through the controller API and
@@ -148,6 +151,10 @@ Current automated coverage:
   otherwise supports.
 - CPU-reference video-stack planning must produce a full CPU prefix and no
   accelerated suffix.
+- Video GPU suffix apply failure handling is implemented through the viewport
+  reporting the failure to the controller; add focused coverage or manual QA
+  evidence before treating display-time suffix failure behavior as fully
+  verified.
 
 ## Manual QA
 

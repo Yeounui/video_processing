@@ -247,6 +247,7 @@ void TestProcessingController::testGpuFailureFallsBackToCpuReference() {
 
     controller.cancelGpuApply();
     QVERIFY(!controller.gpuApplyPending());
+    QCOMPARE(controller.acceleratedBackendKind(), ProcessingBackend::Kind::CpuReference);
 
     const auto out = controller.outImage();
     QVERIFY(out != nullptr);
@@ -259,6 +260,22 @@ void TestProcessingController::testGpuFailureFallsBackToCpuReference() {
     QCOMPARE(out->data[2], uint8_t{45});
     QCOMPARE(controller.historyLabels(), QStringList({QStringLiteral("Brightness")}));
     QCOMPARE(controller.historyIndex(), 0);
+
+    controller.applyAlgorithm(1, QVariantMap{{QStringLiteral("delta"), 10}});
+    QVERIFY(!controller.gpuApplyPending());
+
+    const auto secondOut = controller.outImage();
+    QVERIFY(secondOut != nullptr);
+    QCOMPARE(secondOut->width, 1);
+    QCOMPARE(secondOut->height, 1);
+    QCOMPARE(secondOut->channels, 3);
+    QVERIFY(secondOut->data.size() >= 3);
+    QCOMPARE(secondOut->data[0], uint8_t{35});
+    QCOMPARE(secondOut->data[1], uint8_t{45});
+    QCOMPARE(secondOut->data[2], uint8_t{55});
+    QCOMPARE(controller.historyLabels(),
+             QStringList({QStringLiteral("Brightness"), QStringLiteral("Brightness")}));
+    QCOMPARE(controller.historyIndex(), 1);
 }
 
 void TestProcessingController::testStaleGpuResultDoesNotOverwriteChangedSource() {

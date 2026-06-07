@@ -9,10 +9,10 @@ VideoInputService
     emits ImageBuffer frames
 
 ProcessingController
-    owns source state, history, effect stack, and CPU/GPU selection
+    owns source state, history, effect stack, backend selection, and fallback
 
 ImageProcessorCore
-    applies 28 CPU algorithms through hand-written C++ loops
+    applies 28 CPU algorithms through OpenCV-backed CPU paths
 
 GpuEffectPipeline
     applies selected algorithms through OpenGL 3.3 GLSL shaders
@@ -21,7 +21,7 @@ ProcessingBackend
     reports backend capabilities and plans CPU prefix plus accelerated suffix
 
 ImageIoService
-    loads and saves still images through QImage
+    loads and saves still images through OpenCV imgcodecs
 
 ProcessingViewportItem
     displays ImageBuffer output through the Qt Quick scene graph
@@ -212,6 +212,10 @@ Current implementation note:
 - `ProcessingController` owns the currently selected accelerated backend kind.
   `CpuReference` is a valid selection and forces static apply plus video stack
   planning through the CPU reference path without emitting GPU work.
+- `ProcessingController::markAcceleratedBackendUnavailable()` is the controller
+  boundary for degrading an unusable accelerated backend to `CpuReference`.
+  Static-image accelerated failure/cancel paths and viewport-reported video
+  suffix failures both use this boundary.
 
 ## Video Source Spec
 
@@ -336,6 +340,12 @@ Current controller rules:
   and version still match the current controller output.
 - `cancelGpuApply()` treats accelerated failure as a CPU-reference fallback
   when the pending request is still current; stale failures are discarded.
+  After the current CPU fallback path runs, the selected backend is downgraded
+  to `CpuReference` so later operations do not keep dispatching to the failing
+  accelerated path.
+- `markAcceleratedBackendUnavailable()` switches backend planning to
+  `CpuReference`, which disables static accelerated dispatch and makes video
+  stack planning apply the full stack as a CPU prefix.
 - Source changes, reset, undo, redo, and direct output replacement invalidate
   any pending static-image accelerated request.
 
@@ -349,4 +359,7 @@ The viewport remains Qt-owned:
 - Split compare, zoom, pan, and original/output switching stay viewport
   responsibilities.
 - Stale accelerated results must be rejected if the source changes mid-flight.
+- Video GPU suffix apply failures are reported from `ProcessingViewportItem` to
+  `ProcessingController`, where they trigger the same accelerated-backend
+  downgrade used by static accelerated failures.
 - OpenCV types must not cross into QML-facing APIs.

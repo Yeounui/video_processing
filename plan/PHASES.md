@@ -205,9 +205,21 @@ Implementation note:
 - `ProcessingController` has an explicit non-QML backend selector. Selecting
   `ProcessingBackend::Kind::CpuReference` disables static accelerated dispatch
   and makes video stack planning apply the full stack in the CPU prefix.
-- Phase 5 is not fully verified yet because runtime backend selection,
-  runtime capability detection, and full CPU-only startup coverage still need
-  explicit acceptance tests.
+- `ProcessingController::markAcceleratedBackendUnavailable()` switches the
+  selected backend to `CpuReference` when the accelerated backend is known to be
+  unusable.
+- Static-image accelerated failure/cancel paths first attempt the CPU reference
+  fallback for the current pending request, then mark the accelerated backend
+  unavailable so later GPU-supported algorithms run synchronously on CPU.
+- `ProcessingViewportItem` reports video GPU suffix apply failures to the
+  controller, which downgrades to `CpuReference`; subsequent video stack
+  planning then produces a full CPU prefix and no accelerated suffix.
+- `tst_ProcessingController::testGpuFailureFallsBackToCpuReference` verifies
+  static GPU failure fallback, backend downgrade to `CpuReference`, and a later
+  GPU-supported algorithm applying through CPU without emitting GPU work.
+- Phase 5 is not fully verified yet because initial runtime capability
+  detection, startup backend probing, and full CPU-only application startup
+  coverage still need explicit acceptance tests.
 
 ## Phase 6: Remove Replaced Dependencies
 

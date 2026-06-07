@@ -78,6 +78,7 @@ private slots:
 
 public:
     Q_INVOKABLE void deliverGpuResult(bool ok, std::shared_ptr<ImageBuffer> result);
+    Q_INVOKABLE void notifyGpuPipelineFailure();
 
 private:
     QPointer<ProcessingController> controller_;

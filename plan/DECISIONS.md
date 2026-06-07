@@ -314,3 +314,25 @@ backend before emitting GPU work. Video stack planning uses the same selection,
 so CPU-reference mode produces a full CPU prefix and no accelerated suffix.
 Changing the backend clears pending accelerated work and re-applies the current
 video frame through the newly selected planning path.
+
+## D-021: Downgrade Failed Accelerated Backends To CPU Reference
+
+Status: verified
+
+Decision: when the currently selected accelerated backend fails during static
+apply or display-time video suffix apply, report that failure to
+`ProcessingController` and downgrade the selected backend to
+`ProcessingBackend::Kind::CpuReference`.
+
+Reason: repeatedly dispatching work to a failing accelerated path causes
+avoidable failures and can keep video stacks planned around a suffix that the
+viewport cannot apply. The CPU OpenCV path is the reference backend and is
+already required to preserve state when acceleration is unavailable.
+
+Consequence: static accelerated failure/cancel first falls back to the CPU
+reference implementation for the current pending request when it is still
+current, then marks the accelerated backend unavailable. Video GPU suffix apply
+failure is reported from `ProcessingViewportItem` to the controller and causes
+the same downgrade. After downgrade, GPU-supported static algorithms apply
+synchronously through CPU and video stack planning produces no accelerated
+suffix until a future decision adds re-enable or probing behavior.

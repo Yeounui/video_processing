@@ -16,8 +16,8 @@ requirements.
 | --- | --- | --- | --- |
 | [[README]] | generated | Current status, document map, source evidence, and open questions. | Review generated status and source evidence. |
 | [[OVERVIEW]] | generated | Goal, scope, non-goals, and constraints. | Review scope before implementation. |
-| [[PHASES]] | generated | Suggested implementation order and phase gates. | Continue Phase 4 stream capture evaluation. |
-| [[ARCHITECTURE]] | generated | Qt/OpenCV boundary, data model, algorithm stack model, and required specs. | Resolve open questions before code changes. |
+| [[PHASES]] | generated | Suggested implementation order and phase gates. | Continue Phase 5 runtime backend fallback work. |
+| [[ARCHITECTURE]] | generated | Qt/OpenCV boundary, data model, algorithm stack model, and required specs. | Keep backend selection and fallback rules current. |
 | [[DECISIONS]] | generated | Decisions extracted from current plan notes and existing code behavior. | Add decisions as migration behavior changes. |
 | [[REVIEW]] | generated | Parity, QA, benchmark, and regression policy. | Turn acceptance cases into tests/manual checks. |
 | [[USER]] | generated | Local environment and user-specific constraints. | Fill missing hardware/OpenCV build facts. |
@@ -71,6 +71,13 @@ requirements.
   `ProcessingBackend::Kind::CpuReference` through a non-QML API. In that mode,
   GPU-supported static algorithms apply synchronously through the CPU reference
   path and video stacks produce no accelerated suffix.
+- `ProcessingController::markAcceleratedBackendUnavailable()` now marks the
+  accelerated backend unavailable by switching to `CpuReference`. Current
+  static accelerated failure/cancel paths CPU-fallback first, then downgrade
+  future static and video planning to the CPU reference backend.
+- `ProcessingViewportItem` reports video GPU suffix apply failures back to the
+  controller, causing the same `CpuReference` downgrade so later frames stop
+  planning an accelerated suffix.
 - Plan documents are intended to be tracked through the `.gitignore`
   exception for `plan/*.md`.
 
@@ -126,6 +133,14 @@ requirements.
   algorithm. `.codex/hooks/run-in-conda.sh cmake --build build` and
   `.codex/hooks/run-in-conda.sh ctest --test-dir build --output-on-failure`
   passed after the change.
+- 2026-06-07: Accelerated backend failure now degrades the controller to the
+  CPU reference backend. `tst_ProcessingController::testGpuFailureFallsBackToCpuReference`
+  covers static GPU failure CPU fallback, backend downgrade to
+  `ProcessingBackend::Kind::CpuReference`, and a later GPU-supported algorithm
+  applying through CPU without emitting new GPU work. `.codex/hooks/run-in-conda.sh
+  cmake --build build` passed, `.codex/hooks/run-in-conda.sh ctest --test-dir
+  build --output-on-failure` passed with `5/5` tests, and `git diff --check`
+  passed.
 
 ## Source Evidence
 
@@ -151,7 +166,8 @@ requirements.
   satisfy stream timeout, reconnect, or metadata requirements?
 - Which OpenCV acceleration profile is expected in the target environment:
   CPU-only, OpenCL/UMat, CUDA, or multiple runtime-selectable backends?
-- Should backend selection become a user-visible setting, an environment
-  override, or an automatic runtime capability decision?
+- Should initial backend selection become a user-visible setting, an
+  environment override, or an automatic startup probe beyond the current
+  failure-driven downgrade to `CpuReference`?
 - What are the target performance budgets for static images, video files, and
   real-time streams?

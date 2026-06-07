@@ -73,6 +73,7 @@ public:
     const std::vector<EffectEntry> &effectStack() const { return effectStack_; }
     ProcessingBackend::Kind acceleratedBackendKind() const;
     void setAcceleratedBackendKind(ProcessingBackend::Kind kind);
+    void markAcceleratedBackendUnavailable();
     bool videoEffectStackUsesGpu() const;
     std::vector<EffectEntry> videoGpuEffectSuffix() const;
 
