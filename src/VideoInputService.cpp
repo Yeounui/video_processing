@@ -1,15 +1,18 @@
 #include "VideoInputService.h"
 #include "OpenCvImageBridge.h"
-#include <QByteArray>
 #include <QMetaObject>
 #include <QTimer>
 #include <algorithm>
-#include <cerrno>
+#include <chrono>
 #include <cmath>
+#include <vector>
 
 #include <opencv2/imgproc.hpp>
 
 namespace {
+constexpr int kStreamOpenTimeoutMsec = 3000;
+constexpr int kStreamReadTimeoutMsec = 1000;
+
 std::string toOpenCvPath(const QString &path)
 {
     return path.toUtf8().toStdString();
@@ -20,10 +23,35 @@ double validFrameRateOrFallback(double fps)
     return std::isfinite(fps) && fps > 0.0 ? fps : 25.0;
 }
 
-int interruptCallback(void *opaque)
+bool looksLikeNetworkUrl(const QString &url)
 {
-    auto *stop = static_cast<std::atomic<bool> *>(opaque);
-    return stop && stop->load() ? 1 : 0;
+    return url.contains(QStringLiteral("://"));
+}
+
+std::chrono::milliseconds frameIntervalForFps(double fps)
+{
+    const double validFps = validFrameRateOrFallback(fps);
+    return std::chrono::milliseconds(
+        std::max(1, static_cast<int>(std::lround(1000.0 / validFps))));
+}
+
+bool openStreamCapture(cv::VideoCapture &capture, const QString &url)
+{
+    const std::vector<int> params = {
+        cv::CAP_PROP_OPEN_TIMEOUT_MSEC, kStreamOpenTimeoutMsec,
+        cv::CAP_PROP_READ_TIMEOUT_MSEC, kStreamReadTimeoutMsec,
+    };
+    const std::string source = toOpenCvPath(url);
+    if (capture.open(source, cv::CAP_ANY, params)) {
+        return true;
+    }
+    capture.release();
+
+    if (!looksLikeNetworkUrl(url)) {
+        return capture.open(source, cv::CAP_ANY);
+    }
+
+    return false;
 }
 }
 
@@ -75,27 +103,6 @@ void VideoInputService::close()
 {
     playTimer_->stop();
     fileCapture_.release();
-
-    if (codecCtx_) {
-        avcodec_free_context(&codecCtx_);
-    }
-
-    if (fmtCtx_) {
-        avformat_close_input(&fmtCtx_);
-        fmtCtx_ = nullptr;
-    }
-
-    if (frame_) {
-        av_frame_free(&frame_);
-        frame_ = nullptr;
-    }
-
-    if (swsCtx_) {
-        sws_freeContext(swsCtx_);
-        swsCtx_ = nullptr;
-    }
-
-    videoStreamIdx_ = -1;
     currentTimeSecs_ = 0.0;
     fps_ = 25.0;
     durationSecs_ = 0.0;
@@ -106,106 +113,20 @@ bool VideoInputService::openStream(const QString &url)
     closeStream();
     close();
 
-    avformat_network_init();
-
     streamUrl_ = url;
     isStream_ = true;
     stopProducer_ = false;
     setStreamStatus(StreamStatus::Connecting);
 
-    AVFormatContext *ctx = avformat_alloc_context();
-    if (!ctx) {
-        isStream_ = false;
-        setStreamStatus(StreamStatus::Disconnected);
-        emit errorOccurred("Failed to allocate stream context");
-        return false;
-    }
-
-    ctx->interrupt_callback.callback = interruptCallback;
-    ctx->interrupt_callback.opaque = &stopProducer_;
-
-    const QByteArray urlBytes = url.toUtf8();
-    int ret = avformat_open_input(&ctx, urlBytes.constData(), nullptr, nullptr);
-    if (ret < 0) {
-        avformat_free_context(ctx);
+    if (!openStreamCapture(streamCapture_, url)) {
         isStream_ = false;
         setStreamStatus(StreamStatus::Disconnected);
         emit errorOccurred(QString("Failed to open stream: %1").arg(url));
         return false;
     }
-    fmtCtx_ = ctx;
 
-    ret = avformat_find_stream_info(fmtCtx_, nullptr);
-    if (ret < 0) {
-        close();
-        isStream_ = false;
-        setStreamStatus(StreamStatus::Disconnected);
-        emit errorOccurred("Failed to find stream info");
-        return false;
-    }
-
-    videoStreamIdx_ = -1;
-    for (unsigned int i = 0; i < fmtCtx_->nb_streams; ++i) {
-        if (fmtCtx_->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_VIDEO) {
-            videoStreamIdx_ = static_cast<int>(i);
-            break;
-        }
-    }
-
-    if (videoStreamIdx_ < 0) {
-        close();
-        isStream_ = false;
-        setStreamStatus(StreamStatus::Disconnected);
-        emit errorOccurred("No video stream found");
-        return false;
-    }
-
-    AVCodecParameters *codecParams = fmtCtx_->streams[videoStreamIdx_]->codecpar;
-    const AVCodec *codec = avcodec_find_decoder(codecParams->codec_id);
-    if (!codec) {
-        close();
-        isStream_ = false;
-        setStreamStatus(StreamStatus::Disconnected);
-        emit errorOccurred("Codec not found");
-        return false;
-    }
-
-    codecCtx_ = avcodec_alloc_context3(codec);
-    if (!codecCtx_) {
-        close();
-        isStream_ = false;
-        setStreamStatus(StreamStatus::Disconnected);
-        emit errorOccurred("Failed to allocate codec context");
-        return false;
-    }
-
-    ret = avcodec_parameters_to_context(codecCtx_, codecParams);
-    if (ret < 0) {
-        close();
-        isStream_ = false;
-        setStreamStatus(StreamStatus::Disconnected);
-        emit errorOccurred("Failed to copy codec parameters");
-        return false;
-    }
-
-    ret = avcodec_open2(codecCtx_, codec, nullptr);
-    if (ret < 0) {
-        close();
-        isStream_ = false;
-        setStreamStatus(StreamStatus::Disconnected);
-        emit errorOccurred("Failed to open codec");
-        return false;
-    }
-
-    frame_ = av_frame_alloc();
-    if (!frame_) {
-        close();
-        isStream_ = false;
-        setStreamStatus(StreamStatus::Disconnected);
-        emit errorOccurred("Failed to allocate frame");
-        return false;
-    }
-
+    fps_ = validFrameRateOrFallback(streamCapture_.get(cv::CAP_PROP_FPS));
+    durationSecs_ = 0.0;
     {
         std::lock_guard<std::mutex> lock(latestMutex_);
         latestFrame_.reset();
@@ -234,13 +155,13 @@ void VideoInputService::closeStream()
 
     stopProducer_ = false;
     isStream_ = false;
+    streamCapture_.release();
     {
         std::lock_guard<std::mutex> lock(latestMutex_);
         latestFrame_.reset();
     }
 
     close();
-    videoStreamIdx_ = -1;
     setStreamStatus(StreamStatus::Disconnected);
 }
 
@@ -270,7 +191,7 @@ bool VideoInputService::isOpen() const
         return fileCapture_.isOpened();
     }
 
-    return fmtCtx_ != nullptr && codecCtx_ != nullptr && frame_ != nullptr;
+    return streamCapture_.isOpened();
 }
 
 double VideoInputService::durationSecs() const
@@ -289,7 +210,11 @@ int VideoInputService::videoWidth() const
         return static_cast<int>(std::lround(fileCapture_.get(cv::CAP_PROP_FRAME_WIDTH)));
     }
 
-    return codecCtx_ ? codecCtx_->width : 0;
+    if (streamCapture_.isOpened()) {
+        return static_cast<int>(std::lround(streamCapture_.get(cv::CAP_PROP_FRAME_WIDTH)));
+    }
+
+    return 0;
 }
 
 int VideoInputService::videoHeight() const
@@ -298,12 +223,16 @@ int VideoInputService::videoHeight() const
         return static_cast<int>(std::lround(fileCapture_.get(cv::CAP_PROP_FRAME_HEIGHT)));
     }
 
-    return codecCtx_ ? codecCtx_->height : 0;
+    if (streamCapture_.isOpened()) {
+        return static_cast<int>(std::lround(streamCapture_.get(cv::CAP_PROP_FRAME_HEIGHT)));
+    }
+
+    return 0;
 }
 
 void VideoInputService::play()
 {
-    if (!isOpen()) return;
+    if (!isOpen() || isStream_) return;
     int interval = std::max(1, static_cast<int>(1000.0 / fps_ / speed_));
     playTimer_->start(interval);
 }
@@ -344,12 +273,20 @@ double VideoInputService::speed() const
 
 void VideoInputService::seekToSecs(double secs)
 {
+    if (isStream_) {
+        return;
+    }
+
     seekInternal(secs);
     stepForward();
 }
 
 void VideoInputService::stepForward()
 {
+    if (isStream_) {
+        return;
+    }
+
     auto frame = decodeNextFrame();
     if (frame) {
         emit frameReady(frame);
@@ -359,6 +296,10 @@ void VideoInputService::stepForward()
 
 void VideoInputService::stepBackward()
 {
+    if (isStream_) {
+        return;
+    }
+
     double target = std::max(0.0, currentTimeSecs_ - 2.0 / fps_);
     seekInternal(target);
     stepForward();
@@ -376,52 +317,7 @@ std::shared_ptr<ImageBuffer> VideoInputService::decodeNextFrame()
         return decodeVideoCaptureFrame();
     }
 
-    AVPacket *pkt = av_packet_alloc();
-    if (!pkt) {
-        return nullptr;
-    }
-
-    while (true) {
-        int ret = avcodec_receive_frame(codecCtx_, frame_);
-        if (ret == 0) {
-            auto buf = toImageBuffer(frame_);
-            av_packet_free(&pkt);
-            if (buf) {
-                return buf;
-            }
-            continue;
-        }
-        if (ret != AVERROR(EAGAIN) && ret != AVERROR_EOF) {
-            av_packet_free(&pkt);
-            return nullptr;
-        }
-
-        ret = av_read_frame(fmtCtx_, pkt);
-        if (ret < 0) {
-            avcodec_send_packet(codecCtx_, nullptr);
-            ret = avcodec_receive_frame(codecCtx_, frame_);
-            if (ret == 0) {
-                auto buf = toImageBuffer(frame_);
-                av_packet_free(&pkt);
-                return buf;
-            }
-            av_packet_free(&pkt);
-            return nullptr;
-        }
-
-        // Skip packets from other streams
-        if (pkt->stream_index != videoStreamIdx_) {
-            av_packet_unref(pkt);
-            continue;
-        }
-
-        ret = avcodec_send_packet(codecCtx_, pkt);
-        av_packet_unref(pkt);
-        if (ret < 0 && ret != AVERROR(EAGAIN)) {
-            av_packet_free(&pkt);
-            return nullptr;
-        }
-    }
+    return nullptr;
 }
 
 std::shared_ptr<ImageBuffer> VideoInputService::decodeVideoCaptureFrame()
@@ -478,50 +374,6 @@ std::shared_ptr<ImageBuffer> VideoInputService::toImageBuffer(const cv::Mat &fra
     return buf;
 }
 
-std::shared_ptr<ImageBuffer> VideoInputService::toImageBuffer(AVFrame *f)
-{
-    if (!f || !codecCtx_) {
-        return nullptr;
-    }
-
-    AVPixelFormat srcFmt = static_cast<AVPixelFormat>(f->format);
-    int w = f->width > 0 ? f->width : codecCtx_->width;
-    int h = f->height > 0 ? f->height : codecCtx_->height;
-    if (w <= 0 || h <= 0) {
-        return nullptr;
-    }
-
-    swsCtx_ = sws_getCachedContext(swsCtx_, w, h, srcFmt,
-                                   w, h, AV_PIX_FMT_RGB24,
-                                   SWS_BILINEAR, nullptr, nullptr, nullptr);
-    if (!swsCtx_) {
-        return nullptr;
-    }
-
-    auto buf = std::make_shared<ImageBuffer>();
-    buf->width = w;
-    buf->height = h;
-    buf->channels = 3;
-    buf->data.resize(static_cast<std::size_t>(buf->width * buf->height * 3));
-
-    uint8_t *dst[1] = {buf->data.data()};
-    int dstStride[1] = {buf->width * 3};
-
-    sws_scale(swsCtx_, f->data, f->linesize, 0, h, dst, dstStride);
-
-    // Skip timestamp update in stream mode: currentTimeSecs_ is GUI-thread state,
-    // and toImageBuffer() is called from the producer thread in stream mode.
-    if (!isStream_ && fmtCtx_ && videoStreamIdx_ >= 0) {
-        AVStream *stream = fmtCtx_->streams[videoStreamIdx_];
-        int64_t best_effort_ts = f->best_effort_timestamp;
-        if (best_effort_ts != AV_NOPTS_VALUE) {
-            currentTimeSecs_ = static_cast<double>(best_effort_ts) * av_q2d(stream->time_base);
-        }
-    }
-
-    return buf;
-}
-
 void VideoInputService::seekInternal(double secs)
 {
     if (!isOpen()) return;
@@ -535,12 +387,6 @@ void VideoInputService::seekInternal(double secs)
         currentTimeSecs_ = clampedSecs;
         return;
     }
-
-    AVStream *stream = fmtCtx_->streams[videoStreamIdx_];
-    int64_t ts = static_cast<int64_t>(secs / av_q2d(stream->time_base));
-    av_seek_frame(fmtCtx_, videoStreamIdx_, ts, AVSEEK_FLAG_BACKWARD);
-    avcodec_flush_buffers(codecCtx_);
-    currentTimeSecs_ = secs;
 }
 
 void VideoInputService::onTimerTick()
@@ -565,29 +411,11 @@ void VideoInputService::onTimerTick()
 
 void VideoInputService::runStreamProducer()
 {
-    AVPacket *pkt = av_packet_alloc();
-    if (!pkt) {
-        QMetaObject::invokeMethod(this, &VideoInputService::onStreamDisconnected,
-                                  Qt::QueuedConnection);
-        return;
-    }
+    const auto frameInterval = frameIntervalForFps(fps_);
 
     while (!stopProducer_) {
-        int receiveRet = avcodec_receive_frame(codecCtx_, frame_);
-        if (receiveRet == 0) {
-            auto buf = toImageBuffer(frame_);
-            if (buf) {
-                std::lock_guard<std::mutex> lock(latestMutex_);
-                latestFrame_ = std::move(buf);
-            }
-            continue;
-        }
-        if (receiveRet != AVERROR(EAGAIN) && receiveRet != AVERROR_EOF) {
-            break;
-        }
-
-        int ret = av_read_frame(fmtCtx_, pkt);
-        if (ret < 0) {
+        cv::Mat frame;
+        if (!streamCapture_.read(frame) || frame.empty()) {
             if (!stopProducer_) {
                 QMetaObject::invokeMethod(this, &VideoInputService::onStreamDisconnected,
                                           Qt::QueuedConnection);
@@ -595,19 +423,16 @@ void VideoInputService::runStreamProducer()
             break;
         }
 
-        if (pkt->stream_index != videoStreamIdx_) {
-            av_packet_unref(pkt);
-            continue;
+        auto buf = toImageBuffer(frame);
+        if (buf) {
+            std::lock_guard<std::mutex> lock(latestMutex_);
+            latestFrame_ = std::move(buf);
         }
 
-        ret = avcodec_send_packet(codecCtx_, pkt);
-        av_packet_unref(pkt);
-        if (ret < 0 && ret != AVERROR(EAGAIN)) {
-            break;
+        if (frameInterval.count() > 1) {
+            std::this_thread::sleep_for(frameInterval);
         }
     }
-
-    av_packet_free(&pkt);
 }
 
 void VideoInputService::onDisplayTick()
@@ -644,6 +469,7 @@ void VideoInputService::onStreamDisconnected()
     }
 
     close();
+    streamCapture_.release();
     setStreamStatus(StreamStatus::Disconnected);
 
     if (!streamUrl_.isEmpty()) {

@@ -110,6 +110,9 @@ Current automated coverage:
   seek-to-start delivery, timer play/pause state, loop-disabled EOF finish,
   loop-enabled restart, invalid playback-speed fallback, and missing-file
   errors are covered.
+- Local generated-AVI stream acquisition through OpenCV `cv::VideoCapture` is
+  covered for producer frame delivery and `Connected`/`Disconnected` stream
+  status transitions. Missing stream errors are covered.
 - Seek precision across codecs, exact playback-speed timing tolerance, and
   missing-metadata fallback still need targeted automated or manual coverage
   before Phase 4 can be marked fully verified.
@@ -123,6 +126,10 @@ Real-time stream behavior must cover:
 - Timeout.
 - Error reporting.
 - Slow-processing frame drop policy.
+
+Current stream coverage is local-source only. RTSP/HTTP timeout, reconnect, and
+status behavior still need target-environment validation before Phase 4 can be
+marked verified.
 
 ## Acceleration Acceptance
 

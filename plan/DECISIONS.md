@@ -227,13 +227,13 @@ without changing the public API. PNG RGB/RGBA round trips are covered by tests;
 metadata preservation, EXIF auto-orientation, color profiles, and animated
 formats remain out of scope for this phase.
 
-## D-016: Video Files Use OpenCV VideoCapture While Streams Retain FFmpeg
+## D-016: Video Files Use OpenCV VideoCapture While Streams Initially Retain FFmpeg
 
 Status: verified
 
 Decision: migrate local video file acquisition in `VideoInputService::open()`
-to OpenCV `cv::VideoCapture`, but keep real-time stream acquisition on the
-existing FFmpeg producer path.
+to OpenCV `cv::VideoCapture`, while initially keeping real-time stream
+acquisition on the existing FFmpeg producer path.
 
 Reason: file playback maps cleanly to OpenCV open/read/seek/metadata behavior
 and can be covered by deterministic generated-file tests. Stream behavior still
@@ -241,10 +241,10 @@ depends on explicit interrupt, latest-frame handoff, reconnect timer, timeout,
 and status transitions that have not been proven equivalent with
 `cv::VideoCapture` in the target environment.
 
-Consequence: direct FFmpeg remains a build/runtime dependency until stream
-timeout and reconnect parity are either implemented with OpenCV or accepted as a
-revised behavior. `VideoInputService` now has two acquisition paths but one
-public RGB/RGBA `ImageBuffer` boundary.
+Consequence: this decision captured the incremental file-first migration.
+Stream acquisition has since moved to OpenCV `cv::VideoCapture` under D-025.
+Direct FFmpeg build/runtime references may still remain until Phase 6 removes
+the dependency and related documentation.
 
 ## D-017: Centralize Acceleration Capability Planning
 
@@ -404,3 +404,27 @@ level for the offscreen CPU-reference path. Target hardware and platform
 validation remains separate because real rendering, driver behavior, and
 non-OpenGL Qt Quick backends can still vary outside this deterministic smoke
 test.
+
+## D-025: Use OpenCV VideoCapture For Stream Acquisition
+
+Status: verified
+
+Decision: remove direct FFmpeg stream open/decode from `VideoInputService` and
+use a dedicated OpenCV `cv::VideoCapture` stream producer path alongside the
+existing file capture path. Stream open attempts to configure
+`CAP_PROP_OPEN_TIMEOUT_MSEC=3000` and `CAP_PROP_READ_TIMEOUT_MSEC=1000`;
+non-network/local sources fall back to plain OpenCV open if timeout-parameter
+open fails.
+
+Reason: local file playback already uses OpenCV and the migration goal is to
+consolidate acquisition behind OpenCV while preserving the controller-facing
+`ImageBuffer` boundary. Keeping the latest-frame mutex handoff, display timer,
+reconnect timer, and `StreamStatus` surface limits UI and controller churn
+while replacing the decode backend.
+
+Consequence: deterministic local generated-AVI tests can cover stream producer
+frame delivery and `Connected`/`Disconnected` status transitions, and missing
+stream tests can cover error reporting. RTSP/HTTP timeout, reconnect, and
+status behavior still need target-environment validation before Phase 4 can be
+marked verified. Direct FFmpeg build dependencies and `x264_compat`
+documentation remain Phase 6 cleanup work.

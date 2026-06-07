@@ -21,6 +21,8 @@ private slots:
     void testTimerPlaybackLoopsWhenEnabled();
     void testInvalidSpeedFallsBackToNormalRate();
     void testMissingFileReportsError();
+    void testOpenCvStreamProducesLatestFramesAndStatus();
+    void testMissingStreamReportsError();
 };
 
 namespace {
@@ -224,6 +226,59 @@ void TestVideoInputService::testMissingFileReportsError()
     QVERIFY(!service.isOpen());
     QCOMPARE(errors.size(), 1);
     QVERIFY(errors.front().contains(QStringLiteral("Failed to open video file")));
+}
+
+void TestVideoInputService::testOpenCvStreamProducesLatestFramesAndStatus()
+{
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    const QString path = makeTestVideoOrEmpty(dir);
+    if (path.isEmpty()) {
+        QSKIP("OpenCV VideoWriter could not create the test AVI in this environment.");
+    }
+
+    VideoInputService service;
+    std::vector<std::shared_ptr<ImageBuffer>> frames;
+    QSignalSpy statusSpy(&service, &VideoInputService::streamStatusChanged);
+    connect(&service, &VideoInputService::frameReady, this,
+            [&frames](std::shared_ptr<ImageBuffer> frame) {
+                frames.push_back(std::move(frame));
+            });
+
+    QVERIFY(service.openStream(path));
+    QVERIFY(service.isOpen());
+    QVERIFY(service.isStream());
+    QCOMPARE(service.streamStatus(), VideoInputService::StreamStatus::Connected);
+    QCOMPARE(service.videoWidth(), 4);
+    QCOMPARE(service.videoHeight(), 2);
+
+    QTRY_VERIFY_WITH_TIMEOUT(!frames.empty(), 1500);
+    const auto &firstDelivered = frames.front();
+    QVERIFY(firstDelivered != nullptr);
+    QCOMPARE(firstDelivered->width, 4);
+    QCOMPARE(firstDelivered->height, 2);
+    QCOMPARE(firstDelivered->channels, 3);
+
+    service.closeStream();
+    QCOMPARE(service.streamStatus(), VideoInputService::StreamStatus::Disconnected);
+    QVERIFY(statusSpy.size() >= 2);
+}
+
+void TestVideoInputService::testMissingStreamReportsError()
+{
+    VideoInputService service;
+    QStringList errors;
+    connect(&service, &VideoInputService::errorOccurred, this,
+            [&errors](const QString &message) {
+                errors.push_back(message);
+            });
+
+    QVERIFY(!service.openStream(QStringLiteral("/tmp/qt_ui_opencv_missing_stream.avi")));
+    QVERIFY(!service.isOpen());
+    QVERIFY(!service.isStream());
+    QCOMPARE(service.streamStatus(), VideoInputService::StreamStatus::Disconnected);
+    QCOMPARE(errors.size(), 1);
+    QVERIFY(errors.front().contains(QStringLiteral("Failed to open stream")));
 }
 
 QTEST_MAIN(TestVideoInputService)

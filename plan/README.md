@@ -50,8 +50,17 @@ requirements.
 - Video file playback has automated coverage for generated-file metadata,
   BGR-to-RGB conversion, stepping, seek-to-start delivery, timer playback,
   loop-disabled EOF, loop-enabled restart, and invalid speed fallback.
-- Real-time streams still use the existing FFmpeg producer/reconnect path
-  pending timeout and reconnect parity review.
+- Stream acquisition now uses a separate OpenCV `cv::VideoCapture` producer
+  path in `VideoInputService` while preserving the existing latest-frame mutex
+  handoff, display timer, reconnect timer, and `StreamStatus` surface.
+- Stream open configures `CAP_PROP_OPEN_TIMEOUT_MSEC=3000` and
+  `CAP_PROP_READ_TIMEOUT_MSEC=1000`. Non-network/local sources fall back to
+  plain OpenCV open when timeout-parameter open fails.
+- Local generated-AVI stream coverage verifies OpenCV producer frame delivery
+  plus `Connected` and `Disconnected` stream statuses. Missing stream coverage
+  verifies error reporting.
+- RTSP/HTTP target stream timeout, reconnect, and error-status validation still
+  need real target-environment coverage.
 - The current public image boundary is `ImageBuffer`.
 - OpenCV 4.13.0 is found in the `videoprocess` Conda environment for `core`,
   `imgproc`, `imgcodecs`, and `videoio`.
@@ -220,6 +229,16 @@ requirements.
   cmake --build build` passed, `.codex/hooks/run-in-conda.sh ctest --test-dir
   build --output-on-failure` passed with `6/6` tests, and `git diff --check`
   passed.
+- 2026-06-07: Direct FFmpeg stream open/decode was removed from
+  `VideoInputService` and stream acquisition moved to OpenCV `cv::VideoCapture`
+  through a dedicated stream capture path. Local generated-AVI stream tests
+  cover OpenCV producer frame delivery, `Connected`/`Disconnected` status
+  transitions, and missing-stream errors while retaining the existing
+  latest-frame handoff, display timer, reconnect timer, and `StreamStatus`
+  surface. `.codex/hooks/run-in-conda.sh cmake --build build` passed and
+  `.codex/hooks/run-in-conda.sh ctest --test-dir build --output-on-failure`
+  passed. Direct FFmpeg build dependencies and `x264_compat` references remain
+  for Phase 6 cleanup.
 
 ## Source Evidence
 
@@ -241,8 +260,10 @@ requirements.
 
 ## Open Questions
 
-- Should direct FFmpeg remain as a fallback if `cv::VideoCapture` does not
-  satisfy stream timeout, reconnect, or metadata requirements?
+- Which RTSP/HTTP target streams still need timeout, reconnect, and status
+  validation after moving stream acquisition to OpenCV `cv::VideoCapture`?
+- When should the remaining direct FFmpeg build dependencies and
+  `x264_compat` documentation be removed?
 - Which OpenCV acceleration profile is expected in the target environment:
   CPU-only, OpenCL/UMat, CUDA, or multiple runtime-selectable backends?
 - Should initial backend selection add a user-visible setting beyond the

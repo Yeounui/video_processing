@@ -10,17 +10,11 @@
 
 #include <opencv2/videoio.hpp>
 
-extern "C" {
-#include <libavformat/avformat.h>
-#include <libavcodec/avcodec.h>
-#include <libswscale/swscale.h>
-}
-
 class QTimer;
 
 // Drives video file playback on the GUI thread via QTimer.
-// File sources use OpenCV VideoCapture; stream sources keep the FFmpeg producer
-// path until timeout/reconnect parity is accepted.
+// File and stream sources use OpenCV VideoCapture. Stream sources keep the
+// latest-frame handoff and reconnect/status policy from the previous producer.
 class VideoInputService : public QObject {
     Q_OBJECT
 public:
@@ -79,7 +73,6 @@ private:
     std::shared_ptr<ImageBuffer> decodeNextFrame();
     std::shared_ptr<ImageBuffer> decodeVideoCaptureFrame();
     std::shared_ptr<ImageBuffer> toImageBuffer(const cv::Mat &frame);
-    std::shared_ptr<ImageBuffer> toImageBuffer(AVFrame *f);
 
     // Seek to timestamp in seconds (flushes decoder buffers).
     void seekInternal(double secs);
@@ -89,12 +82,7 @@ private:
     void setStreamStatus(StreamStatus s);
 
     cv::VideoCapture fileCapture_;
-
-    AVFormatContext *fmtCtx_   = nullptr;
-    AVCodecContext  *codecCtx_ = nullptr;
-    AVFrame         *frame_    = nullptr;  // reused across decodeNextFrame calls
-    SwsContext      *swsCtx_   = nullptr;
-    int              videoStreamIdx_ = -1;
+    cv::VideoCapture streamCapture_;
 
     double durationSecs_    = 0.0;
     double fps_             = 25.0;

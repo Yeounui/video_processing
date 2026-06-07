@@ -233,10 +233,10 @@ The OpenCV video path must define:
 - Frame drop policy for slow processing.
 - Thread-safety and signal-thread rules.
 
-`cv::VideoCapture` can replace direct FFmpeg only after these behaviors are
-accepted. If OpenCV cannot provide equivalent timeout, reconnect, or metadata
-control in the target environment, direct FFmpeg may need to remain as a
-fallback.
+`cv::VideoCapture` now owns both local-file and stream acquisition in
+`VideoInputService`. Stream target behavior still needs RTSP/HTTP validation
+because timeout, reconnect, and status behavior can vary by OpenCV backend and
+target environment.
 
 Implemented file-video contract:
 
@@ -261,8 +261,17 @@ Implemented file-video contract:
   non-positive speed input back to `1.0`, stops and emits
   `playbackFinished()` at EOF when loop is disabled, and seeks to the first
   frame before continuing when loop is enabled.
-- Real-time stream open, latest-frame display, disconnect, reconnect, timeout
-  interrupt, and status reporting still use the existing FFmpeg path.
+- Real-time stream open/decode uses a dedicated OpenCV `cv::VideoCapture`
+  producer path separate from file playback.
+- Stream open sets `CAP_PROP_OPEN_TIMEOUT_MSEC=3000` and
+  `CAP_PROP_READ_TIMEOUT_MSEC=1000`. Non-network/local sources fall back to
+  plain `VideoCapture::open()` when timeout-parameter open fails.
+- The existing latest-frame mutex handoff, display timer, reconnect timer, and
+  `StreamStatus` surface remain the controller-facing contract.
+- Local generated-AVI stream tests cover frame delivery and
+  `Connected`/`Disconnected` statuses. Missing stream tests cover error
+  reporting. RTSP/HTTP timeout and reconnect parity remain target-environment
+  validation items.
 
 ## Image I/O Spec
 

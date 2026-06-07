@@ -129,6 +129,10 @@ Status: generated
 Replace direct FFmpeg video acquisition with `cv::VideoCapture` only if it
 satisfies current file and stream behavior.
 
+Current implementation state: OpenCV stream acquisition is implemented with
+local producer coverage, but RTSP/HTTP target stream timeout, reconnect, and
+status validation remain open.
+
 Exit criteria:
 
 - File playback supports open, first frame, play, pause, seek, step, loop,
@@ -153,9 +157,18 @@ Implementation note:
   `seekToSecs()` behavior of immediately delivering the next frame.
 - File timer playback behavior is covered for play/pause state, loop-disabled
   EOF finish, loop-enabled restart, and invalid playback-speed fallback.
-- Real-time streams still use the existing FFmpeg producer, interrupt callback,
-  latest-frame handoff, reconnect timer, and status signals. Direct FFmpeg
-  removal remains blocked until stream timeout/reconnect parity is accepted.
+- Real-time stream acquisition now uses a separate OpenCV `cv::VideoCapture`
+  producer path instead of direct FFmpeg open/decode.
+- Stream open configures `CAP_PROP_OPEN_TIMEOUT_MSEC=3000` and
+  `CAP_PROP_READ_TIMEOUT_MSEC=1000`; non-network/local sources fall back to
+  plain OpenCV open when timeout-parameter open fails.
+- The existing latest-frame mutex handoff, display timer, reconnect timer, and
+  `StreamStatus` signal surface are preserved.
+- Local generated-AVI stream coverage verifies OpenCV producer frame delivery
+  and `Connected`/`Disconnected` statuses; missing stream coverage verifies
+  error reporting.
+- RTSP/HTTP target stream timeout, reconnect, and status behavior still need
+  real target-environment validation before Phase 4 can be marked verified.
 
 ## Phase 5: Introduce Acceleration Backend
 
@@ -273,9 +286,22 @@ Status: generated
 Remove direct FFmpeg and old GLSL processing dependencies only after the OpenCV
 paths meet the previous phase gates.
 
+Current implementation state: direct FFmpeg stream open/decode has been removed
+from `VideoInputService`, but direct FFmpeg build/documentation references
+still remain and old OpenGL/GLSL processing is still the active accelerated
+backend.
+
 Exit criteria:
 
 - Build files no longer require removed dependencies.
 - No source path still depends on removed headers or shader programs.
 - Review checks in [[REVIEW]] pass for static images, video files, streams, and
   accelerated fallback.
+
+Implementation note:
+
+- Direct FFmpeg stream open/decode has been removed from `VideoInputService`,
+  but `CMakeLists.txt`, root `README.md`, and `x264_compat` documentation still
+  reference direct FFmpeg build/runtime compatibility. Removing those build and
+  documentation dependencies remains Phase 6 work after stream target
+  validation is accepted.
