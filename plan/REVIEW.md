@@ -155,6 +155,16 @@ Current automated coverage:
   an environment RAII guard sets `QT_UI_PROCESSING_BACKEND=cpu-reference`,
   controller construction selects `CpuReference`, and brightness applies
   through CPU with no GPU pending state and normal history.
+- Runtime unavailable startup probing is covered by
+  `tst_ProcessingController::testProcessingBackendRuntimeProbeSelectsCpuReference`:
+  with an empty backend env and runtime acceleration marked unavailable,
+  controller construction selects `CpuReference` and brightness applies through
+  CPU with no GPU pending state.
+- Environment-forced CPU-reference video planning is covered by
+  `tst_ProcessingController::testProcessingBackendEnvironmentDisablesVideoGpuSuffix`:
+  even with runtime acceleration marked available, `QT_UI_PROCESSING_BACKEND=cpu-reference`
+  prevents a video brightness effect from producing a GPU suffix and applies
+  the result through CPU.
 - CPU-reference video-stack planning must produce a full CPU prefix and no
   accelerated suffix.
 - Video GPU suffix apply failure handling is covered by

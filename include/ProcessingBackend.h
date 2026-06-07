@@ -28,6 +28,9 @@ public:
     static bool supportsFusedStack(const std::vector<Effect> &effects,
                                    Kind kind = Kind::OpenGl);
     static bool requiresCpuStatistics(int algorithmId);
+    static void setRuntimeAcceleratedBackendAvailable(bool available);
+    static void clearRuntimeAcceleratedBackendAvailability();
+    static bool runtimeAcceleratedBackendAvailable();
     static Kind defaultKindFromEnvironment();
     static StackPlan planVideoStack(const std::vector<Effect> &effects,
                                     Kind kind = Kind::OpenGl);

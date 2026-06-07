@@ -186,9 +186,19 @@ Implementation note:
   CPU-prefix/accelerated-suffix planning for video stacks.
 - `ProcessingBackend::defaultKindFromEnvironment()` initializes the processing
   backend from `QT_UI_PROCESSING_BACKEND` when a `ProcessingController` is
-  constructed. `cpu`, `cpu-reference`, and `cpureference` force
-  `CpuReference`; unset, invalid, `opengl`, and `gl` preserve the default
-  `OpenGl` backend.
+  constructed. `cpu`, `cpu-reference`, and `cpureference` are hard CPU
+  overrides. Empty, unset, invalid, `opengl`, and `gl` follow the runtime
+  accelerated availability probe: unavailable starts in `CpuReference`,
+  otherwise the default remains `OpenGl`.
+- `ProcessingBackend` exposes runtime accelerated availability probe state with
+  `setRuntimeAcceleratedBackendAvailable(bool)`,
+  `clearRuntimeAcceleratedBackendAvailability()`, and
+  `runtimeAcceleratedBackendAvailable()`.
+- `main.cpp` sets the runtime probe after `QGuiApplication` creation from
+  `QQuickWindow::graphicsApi()`: `Unknown` and `OpenGL` are considered
+  accelerated-runtime available, while explicit non-OpenGL graphics APIs force
+  the startup backend selection toward `CpuReference` unless the environment
+  hard-overrides to CPU already did so.
 - `GpuEffectPipeline` keeps the OpenGL execution implementation but delegates
   public support checks to `ProcessingBackend`, so future OpenCV UMat/CUDA
   backends can replace or extend capability planning without exposing OpenCV
@@ -234,9 +244,16 @@ Implementation note:
   `QT_UI_PROCESSING_BACKEND=cpu-reference`, confirming the initial backend is
   `CpuReference`, and applying brightness through CPU without GPU pending
   state.
+- `tst_ProcessingController::testProcessingBackendRuntimeProbeSelectsCpuReference`
+  verifies empty env plus runtime unavailable starts the controller in
+  `CpuReference` and applies brightness through CPU without GPU pending state.
+- `tst_ProcessingController::testProcessingBackendEnvironmentDisablesVideoGpuSuffix`
+  verifies `QT_UI_PROCESSING_BACKEND=cpu-reference` disables video GPU suffix
+  planning even when runtime acceleration is marked available, so video
+  brightness is CPU-applied.
 - Phase 5 is not fully verified yet because initial runtime capability
-  detection, automatic startup backend probing, and full CPU-only application
-  startup coverage still need explicit acceptance tests.
+  behavior still needs target-environment validation and full CPU-only
+  application startup coverage.
 
 ## Phase 6: Remove Replaced Dependencies
 

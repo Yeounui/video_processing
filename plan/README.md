@@ -61,8 +61,18 @@ requirements.
   eligibility, and CPU-prefix/accelerated-suffix planning for video stacks.
 - `ProcessingBackend::defaultKindFromEnvironment()` reads
   `QT_UI_PROCESSING_BACKEND` during controller construction. Values `cpu`,
-  `cpu-reference`, and `cpureference` force `CpuReference`; unset, invalid,
-  `opengl`, and `gl` keep the existing default `OpenGl`.
+  `cpu-reference`, and `cpureference` force `CpuReference`. Empty, unset,
+  invalid, `opengl`, and `gl` follow the runtime accelerated availability
+  probe: unavailable selects `CpuReference`, otherwise the default remains
+  `OpenGl`.
+- `ProcessingBackend` exposes runtime accelerated availability probe state via
+  `setRuntimeAcceleratedBackendAvailable(bool)`,
+  `clearRuntimeAcceleratedBackendAvailability()`, and
+  `runtimeAcceleratedBackendAvailable()`.
+- `main.cpp` records the startup probe after `QGuiApplication` construction by
+  checking `QQuickWindow::graphicsApi()`: `Unknown` and `OpenGL` are treated as
+  accelerated-runtime available, while an explicit non-OpenGL graphics API is
+  treated as unavailable.
 - CPU-applied effect-stack entries compute `stat_*` parameters from the current
   prefix image before applying statistics-dependent algorithms, preserving the
   CPU-statistics contract for hybrid CPU/GPU stacks.
@@ -174,6 +184,20 @@ requirements.
   `.codex/hooks/run-in-conda.sh cmake --build build` passed,
   `.codex/hooks/run-in-conda.sh ctest --test-dir build --output-on-failure`
   passed with `5/5` tests, and `git diff --check` passed.
+- 2026-06-07: Initial runtime accelerated backend availability probing was
+  added. `main.cpp` records Qt Quick graphics API availability after
+  `QGuiApplication` construction, and `ProcessingBackend::defaultKindFromEnvironment()`
+  now combines CPU env hard override with the runtime probe. `tst_ProcessingController::testProcessingBackendRuntimeProbeSelectsCpuReference`
+  covers empty env plus runtime unavailable selecting `CpuReference` and
+  applying brightness synchronously on CPU with no GPU pending state.
+  `tst_ProcessingController::testProcessingBackendEnvironmentDisablesVideoGpuSuffix`
+  covers `QT_UI_PROCESSING_BACKEND=cpu-reference` keeping video brightness off
+  the GPU suffix even when runtime acceleration is marked available. The
+  existing environment override test now guards runtime availability to confirm
+  the CPU env override is independent of the probe. `.codex/hooks/run-in-conda.sh
+  cmake --build build` passed, `.codex/hooks/run-in-conda.sh ctest --test-dir
+  build --output-on-failure` passed with `5/5` tests, and `git diff --check`
+  passed.
 
 ## Source Evidence
 
@@ -199,8 +223,10 @@ requirements.
   satisfy stream timeout, reconnect, or metadata requirements?
 - Which OpenCV acceleration profile is expected in the target environment:
   CPU-only, OpenCL/UMat, CUDA, or multiple runtime-selectable backends?
-- Should initial backend selection add a user-visible setting or automatic
-  startup probe beyond the current environment override and failure-driven
-  downgrade to `CpuReference`?
+- Should initial backend selection add a user-visible setting beyond the
+  current environment override, startup Qt Quick graphics API probe, and
+  failure-driven downgrade to `CpuReference`?
+- Which target environments still need full application startup validation for
+  CPU-only or non-OpenGL Qt Quick graphics APIs?
 - What are the target performance budgets for static images, video files, and
   real-time streams?

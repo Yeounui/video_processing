@@ -1,8 +1,11 @@
+#include "ProcessingBackend.h"
+
 #include <QFileInfo>
 #include <QGuiApplication>
 #include <QQmlApplicationEngine>
 #include <QPointer>
 #include <QQuickWindow>
+#include <QSGRendererInterface>
 #include <QTimer>
 
 namespace {
@@ -43,6 +46,10 @@ int main(int argc, char *argv[])
     applyWslgRuntimeFix();
 
     QGuiApplication app(argc, argv);
+    const auto graphicsApi = QQuickWindow::graphicsApi();
+    ProcessingBackend::setRuntimeAcceleratedBackendAvailable(
+        graphicsApi == QSGRendererInterface::Unknown
+        || graphicsApi == QSGRendererInterface::OpenGL);
 
     QQmlApplicationEngine engine;
 

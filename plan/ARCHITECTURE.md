@@ -323,8 +323,14 @@ Required rules:
 - CPU is the reference backend.
 - Accelerated backend availability is detected at runtime.
 - `QT_UI_PROCESSING_BACKEND` may force the initial controller backend to
-  `CpuReference` with `cpu`, `cpu-reference`, or `cpureference`; unset,
-  invalid, `opengl`, and `gl` preserve the default `OpenGl` selection.
+  `CpuReference` with `cpu`, `cpu-reference`, or `cpureference`.
+- Initial backend precedence is: CPU environment hard override, then runtime
+  accelerated availability probe, then `OpenGl` default. Empty, unset, invalid,
+  `opengl`, and `gl` values use the runtime probe instead of bypassing it.
+- `main.cpp` sets the runtime accelerated availability probe after
+  `QGuiApplication` creation by reading `QQuickWindow::graphicsApi()`.
+  `Unknown` and `OpenGL` mean accelerated-runtime available; explicit
+  non-OpenGL graphics APIs mean unavailable.
 - CUDA is not required for application startup.
 - Per-algorithm support is represented as backend capability, not hard-coded UI
   behavior.
@@ -339,6 +345,10 @@ Current controller rules:
 
 - `ProcessingController` initializes its selected backend from
   `ProcessingBackend::defaultKindFromEnvironment()` during construction.
+- `ProcessingBackend` owns process-level runtime availability probe state via
+  `setRuntimeAcceleratedBackendAvailable(bool)`,
+  `clearRuntimeAcceleratedBackendAvailability()`, and
+  `runtimeAcceleratedBackendAvailable()`.
 - Static-image accelerated apply stores the algorithm ID, CPU-prepared
   parameter map, previous output image, and output version at dispatch time.
 - `commitGpuResult()` accepts the result only when the pending output pointer

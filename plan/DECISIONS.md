@@ -357,3 +357,26 @@ accelerated dispatch is attempted. The override controls only the initial
 controller backend; runtime accelerated failures can still downgrade to
 `CpuReference`, and future automatic probing or UI settings need an explicit
 precedence decision before changing this startup contract.
+
+## D-023: Probe Initial Accelerated Backend Availability At Startup
+
+Status: verified
+
+Decision: keep `QT_UI_PROCESSING_BACKEND=cpu|cpu-reference|cpureference` as a
+hard CPU reference override, but let empty, unset, invalid, `opengl`, and `gl`
+values follow process-level runtime accelerated availability before choosing
+the initial controller backend. `main.cpp` records that availability after
+`QGuiApplication` construction from `QQuickWindow::graphicsApi()`: `Unknown`
+and `OpenGL` are treated as accelerated-runtime available, while explicit
+non-OpenGL graphics APIs are treated as unavailable.
+
+Reason: the application should avoid dispatching OpenGL accelerated processing
+when Qt Quick is explicitly running on a non-OpenGL graphics API, while still
+preserving the documented CPU environment override and the existing OpenGL
+default for normal or unknown startup conditions.
+
+Consequence: controller construction can start in `CpuReference` without first
+attempting and failing accelerated processing when the startup probe marks the
+accelerated runtime unavailable. The probe is still a startup selection signal,
+not full target-environment validation; CPU-only application startup and
+hardware/backend-specific acceptance remain separate Phase 5 evidence.

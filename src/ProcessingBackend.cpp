@@ -2,9 +2,11 @@
 
 #include <QString>
 #include <algorithm>
+#include <optional>
 
 namespace {
 constexpr auto kProcessingBackendEnv = "QT_UI_PROCESSING_BACKEND";
+std::optional<bool> runtimeAcceleratedBackendAvailableOverride;
 
 bool containsAlgorithm(const int *begin, const int *end, int algorithmId)
 {
@@ -50,12 +52,31 @@ bool ProcessingBackend::requiresCpuStatistics(int algorithmId)
     return algorithmId == 5 || algorithmId == 10 || algorithmId == 23;
 }
 
+void ProcessingBackend::setRuntimeAcceleratedBackendAvailable(bool available)
+{
+    runtimeAcceleratedBackendAvailableOverride = available;
+}
+
+void ProcessingBackend::clearRuntimeAcceleratedBackendAvailability()
+{
+    runtimeAcceleratedBackendAvailableOverride.reset();
+}
+
+bool ProcessingBackend::runtimeAcceleratedBackendAvailable()
+{
+    return runtimeAcceleratedBackendAvailableOverride.value_or(true);
+}
+
 ProcessingBackend::Kind ProcessingBackend::defaultKindFromEnvironment()
 {
     const QString value = qEnvironmentVariable(kProcessingBackendEnv).trimmed().toLower();
     if (value == QStringLiteral("cpu")
         || value == QStringLiteral("cpu-reference")
         || value == QStringLiteral("cpureference")) {
+        return Kind::CpuReference;
+    }
+
+    if (!runtimeAcceleratedBackendAvailable()) {
         return Kind::CpuReference;
     }
 
