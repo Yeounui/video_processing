@@ -6,11 +6,26 @@
 
 namespace {
 constexpr auto kProcessingBackendEnv = "QT_UI_PROCESSING_BACKEND";
+constexpr auto kQtQuickBackendEnv = "QT_QUICK_BACKEND";
+constexpr auto kQsgRhiBackendEnv = "QSG_RHI_BACKEND";
 std::optional<bool> runtimeAcceleratedBackendAvailableOverride;
 
 bool containsAlgorithm(const int *begin, const int *end, int algorithmId)
 {
     return std::find(begin, end, algorithmId) != end;
+}
+
+bool environmentForcesNonOpenGlSceneGraph()
+{
+    const QString quickBackend = qEnvironmentVariable(kQtQuickBackendEnv).trimmed().toLower();
+    if (quickBackend == QStringLiteral("software")) {
+        return true;
+    }
+
+    const QString rhiBackend = qEnvironmentVariable(kQsgRhiBackendEnv).trimmed().toLower();
+    return !rhiBackend.isEmpty()
+        && rhiBackend != QStringLiteral("opengl")
+        && rhiBackend != QStringLiteral("gl");
 }
 }
 
@@ -80,6 +95,10 @@ ProcessingBackend::Kind ProcessingBackend::defaultKindFromEnvironment()
     if (value == QStringLiteral("cpu")
         || value == QStringLiteral("cpu-reference")
         || value == QStringLiteral("cpureference")) {
+        return Kind::CpuReference;
+    }
+
+    if (environmentForcesNonOpenGlSceneGraph()) {
         return Kind::CpuReference;
     }
 

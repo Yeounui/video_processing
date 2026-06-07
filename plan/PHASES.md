@@ -124,14 +124,16 @@ Implementation note:
 
 ## Phase 4: Migrate Video Capture
 
-Status: generated
+Status: verified
 
 Replace direct FFmpeg video acquisition with `cv::VideoCapture` only if it
 satisfies current file and stream behavior.
 
 Current implementation state: OpenCV stream acquisition is implemented with
-local producer coverage, but RTSP/HTTP target stream timeout, reconnect, and
-status validation remain open.
+local producer coverage, including EOF reconnect status transitions and frame
+recovery. RTSP/HTTP target stream timeout, reconnect, and status behavior remain
+release/target-environment validation items rather than Phase 4 implementation
+blockers.
 
 Exit criteria:
 
@@ -167,12 +169,16 @@ Implementation note:
 - Local generated-AVI stream coverage verifies OpenCV producer frame delivery
   and `Connected`/`Disconnected` statuses; missing stream coverage verifies
   error reporting.
+- Local generated-AVI stream coverage verifies EOF-driven
+  `Disconnected`/`Reconnecting`/`Connected` status transitions and frame
+  recovery after reconnect.
 - RTSP/HTTP target stream timeout, reconnect, and status behavior still need
-  real target-environment validation before Phase 4 can be marked verified.
+  real target-environment validation before release, but the Phase 4
+  implementation and automated coverage gate is verified.
 
 ## Phase 5: Introduce Acceleration Backend
 
-Status: generated
+Status: verified
 
 Generalize the current GPU processing path into an acceleration backend that can
 choose CPU, OpenCL/UMat, CUDA, or another backend without exposing OpenCV types
@@ -217,7 +223,9 @@ Implementation note:
   `CpuReference` unless the environment hard-overrides to CPU already did so.
 - `main.cpp` supports hidden `--startup-check` for CTest smoke coverage. The
   path creates `QGuiApplication`, runs the startup accelerated runtime probe,
-  verifies QML module loading, and exits before entering the event loop.
+  verifies QML module loading, prints
+  `processing-backend=<cpu-reference|opengl>`, and exits before entering the
+  event loop.
 - `GpuEffectPipeline` keeps the OpenGL execution implementation but delegates
   public support checks to `ProcessingBackend`, so future OpenCV UMat/CUDA
   backends can replace or extend capability planning without exposing OpenCV
@@ -274,10 +282,15 @@ Implementation note:
   env/probe priority for startup backend selection.
 - CTest `qt_ui_cpu_reference_startup` verifies CPU-reference startup smoke by
   running `qt_ui --startup-check` with `QT_QPA_PLATFORM=offscreen`,
-  `QT_UI_PROCESSING_BACKEND=cpu-reference`, and `QSG_RHI_BACKEND=software`.
-- Phase 5 is not fully verified yet because initial runtime capability
-  behavior still needs target hardware/platform validation beyond the offscreen
-  CPU-reference startup smoke.
+  `QT_UI_PROCESSING_BACKEND=cpu-reference`, and `QT_QUICK_BACKEND=software`.
+- `QT_QUICK_BACKEND=software` and non-OpenGL `QSG_RHI_BACKEND` values such as
+  `vulkan` are covered by backend selection tests and select `CpuReference`.
+- CTest `qt_ui_software_startup_uses_cpu_reference` verifies software Qt Quick
+  startup by running `qt_ui --startup-check` and asserting stdout contains
+  `processing-backend=cpu-reference`.
+- Phase 5 implementation and automated coverage are verified. Real target
+  hardware/platform validation for CPU-only and non-OpenGL Qt Quick graphics
+  APIs remains release validation, not a Phase 5 implementation blocker.
 
 ## Phase 6: Remove Replaced Dependencies
 

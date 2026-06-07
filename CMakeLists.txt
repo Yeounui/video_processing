@@ -188,6 +188,13 @@ if(Qt6Test_FOUND AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests")
 
     add_test(NAME qt_ui_cpu_reference_startup COMMAND qt_ui --startup-check)
     set_tests_properties(qt_ui_cpu_reference_startup PROPERTIES
-        ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_UI_PROCESSING_BACKEND=cpu-reference;QSG_RHI_BACKEND=software"
+        ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_UI_PROCESSING_BACKEND=cpu-reference;QT_QUICK_BACKEND=software"
+        PASS_REGULAR_EXPRESSION "processing-backend=cpu-reference"
+    )
+
+    add_test(NAME qt_ui_software_startup_uses_cpu_reference COMMAND qt_ui --startup-check)
+    set_tests_properties(qt_ui_software_startup_uses_cpu_reference PROPERTIES
+        ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_QUICK_BACKEND=software"
+        PASS_REGULAR_EXPRESSION "processing-backend=cpu-reference"
     )
 endif()

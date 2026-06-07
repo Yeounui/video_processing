@@ -21,6 +21,8 @@ private slots:
     void testProcessingBackendGraphicsApiAvailability();
     void testProcessingBackendRuntimeProbeKeepsOpenGlWhenAvailable();
     void testProcessingBackendInvalidEnvironmentFollowsRuntimeProbe();
+    void testProcessingBackendQtQuickSoftwareSelectsCpuReference();
+    void testProcessingBackendNonOpenGlRhiSelectsCpuReference();
     void testMedianGpuAndHybridSuffixSupport();
     void testCpuEffectStackComputesStatisticsPerSource();
     void testProcessingBackendRuntimeProbeSelectsCpuReference();
@@ -256,6 +258,8 @@ void TestProcessingController::testProcessingBackendGraphicsApiAvailability() {
 
 void TestProcessingController::testProcessingBackendRuntimeProbeKeepsOpenGlWhenAvailable() {
     EnvVarGuard backendEnv("QT_UI_PROCESSING_BACKEND", "");
+    EnvVarGuard quickBackendEnv("QT_QUICK_BACKEND", "");
+    EnvVarGuard rhiBackendEnv("QSG_RHI_BACKEND", "");
     RuntimeAvailabilityGuard runtimeAvailable(true);
 
     QCOMPARE(ProcessingBackend::defaultKindFromEnvironment(), ProcessingBackend::Kind::OpenGl);
@@ -263,7 +267,29 @@ void TestProcessingController::testProcessingBackendRuntimeProbeKeepsOpenGlWhenA
 
 void TestProcessingController::testProcessingBackendInvalidEnvironmentFollowsRuntimeProbe() {
     EnvVarGuard backendEnv("QT_UI_PROCESSING_BACKEND", "opengl");
+    EnvVarGuard quickBackendEnv("QT_QUICK_BACKEND", "");
+    EnvVarGuard rhiBackendEnv("QSG_RHI_BACKEND", "");
     RuntimeAvailabilityGuard runtimeUnavailable(false);
+
+    QCOMPARE(ProcessingBackend::defaultKindFromEnvironment(),
+             ProcessingBackend::Kind::CpuReference);
+}
+
+void TestProcessingController::testProcessingBackendQtQuickSoftwareSelectsCpuReference() {
+    EnvVarGuard backendEnv("QT_UI_PROCESSING_BACKEND", "");
+    EnvVarGuard quickBackendEnv("QT_QUICK_BACKEND", "software");
+    EnvVarGuard rhiBackendEnv("QSG_RHI_BACKEND", "");
+    RuntimeAvailabilityGuard runtimeAvailable(true);
+
+    QCOMPARE(ProcessingBackend::defaultKindFromEnvironment(),
+             ProcessingBackend::Kind::CpuReference);
+}
+
+void TestProcessingController::testProcessingBackendNonOpenGlRhiSelectsCpuReference() {
+    EnvVarGuard backendEnv("QT_UI_PROCESSING_BACKEND", "");
+    EnvVarGuard quickBackendEnv("QT_QUICK_BACKEND", "");
+    EnvVarGuard rhiBackendEnv("QSG_RHI_BACKEND", "vulkan");
+    RuntimeAvailabilityGuard runtimeAvailable(true);
 
     QCOMPARE(ProcessingBackend::defaultKindFromEnvironment(),
              ProcessingBackend::Kind::CpuReference);

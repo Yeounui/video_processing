@@ -234,9 +234,11 @@ The OpenCV video path must define:
 - Thread-safety and signal-thread rules.
 
 `cv::VideoCapture` now owns both local-file and stream acquisition in
-`VideoInputService`. Stream target behavior still needs RTSP/HTTP validation
-because timeout, reconnect, and status behavior can vary by OpenCV backend and
-target environment.
+`VideoInputService`. Local automated coverage verifies stream open, frame
+delivery, missing-stream errors, EOF reconnect status transitions, and frame
+recovery. RTSP/HTTP target behavior remains release validation because timeout,
+reconnect, and status behavior can vary by OpenCV backend and target
+environment.
 
 Implemented file-video contract:
 
@@ -270,8 +272,10 @@ Implemented file-video contract:
   `StreamStatus` surface remain the controller-facing contract.
 - Local generated-AVI stream tests cover frame delivery and
   `Connected`/`Disconnected` statuses. Missing stream tests cover error
-  reporting. RTSP/HTTP timeout and reconnect parity remain target-environment
-  validation items.
+  reporting. Local generated-AVI tests also cover EOF-driven
+  `Disconnected`/`Reconnecting`/`Connected` status transitions and frame
+  recovery after reconnect. RTSP/HTTP timeout and reconnect parity remain
+  release target-environment validation items.
 
 ## Image I/O Spec
 
@@ -345,7 +349,8 @@ Required rules:
   `Null` mean unavailable.
 - `qt_ui --startup-check` is a hidden test/smoke path. It creates the
   application object, records the startup runtime probe, verifies QML module
-  loading, and exits before the Qt event loop.
+  loading, prints `processing-backend=<cpu-reference|opengl>` to stdout, and
+  exits before the Qt event loop.
 - CUDA is not required for application startup.
 - Per-algorithm support is represented as backend capability, not hard-coded UI
   behavior.

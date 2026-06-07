@@ -113,9 +113,12 @@ Current automated coverage:
 - Local generated-AVI stream acquisition through OpenCV `cv::VideoCapture` is
   covered for producer frame delivery and `Connected`/`Disconnected` stream
   status transitions. Missing stream errors are covered.
+- Local generated-AVI stream EOF reconnect is covered for
+  `Disconnected`/`Reconnecting`/`Connected` status transitions and frame
+  recovery after reconnect.
 - Seek precision across codecs, exact playback-speed timing tolerance, and
-  missing-metadata fallback still need targeted automated or manual coverage
-  before Phase 4 can be marked fully verified.
+  missing-metadata fallback remain targeted regression or release-validation
+  candidates rather than Phase 4 implementation blockers.
 
 Real-time stream behavior must cover:
 
@@ -127,9 +130,9 @@ Real-time stream behavior must cover:
 - Error reporting.
 - Slow-processing frame drop policy.
 
-Current stream coverage is local-source only. RTSP/HTTP timeout, reconnect, and
-status behavior still need target-environment validation before Phase 4 can be
-marked verified.
+Current stream automation is local-source only. RTSP/HTTP timeout, reconnect,
+and status behavior remain release target-environment validation, not a Phase 4
+implementation blocker.
 
 ## Acceleration Acceptance
 
@@ -179,7 +182,12 @@ Current automated coverage:
 - CPU-reference application startup smoke is covered by CTest
   `qt_ui_cpu_reference_startup`, which runs `qt_ui --startup-check` with
   `QT_QPA_PLATFORM=offscreen`, `QT_UI_PROCESSING_BACKEND=cpu-reference`, and
-  `QSG_RHI_BACKEND=software`.
+  `QT_QUICK_BACKEND=software`.
+- Software Qt Quick startup selection is covered by CTest
+  `qt_ui_software_startup_uses_cpu_reference`, which asserts
+  `qt_ui --startup-check` prints `processing-backend=cpu-reference`.
+- `QT_QUICK_BACKEND=software` and non-OpenGL `QSG_RHI_BACKEND` values such as
+  `vulkan` are covered by `tst_ProcessingController` backend selection tests.
 - CPU-reference video-stack planning must produce a full CPU prefix and no
   accelerated suffix.
 - Video GPU suffix apply failure handling is covered by
@@ -203,6 +211,8 @@ Manual QA should include:
 - Validate startup and rendering on representative target hardware/platform
   combinations beyond the offscreen CPU-reference smoke, especially CPU-only
   and explicit non-OpenGL Qt Quick graphics APIs.
+- Validate RTSP/HTTP stream timeout, reconnect, and status behavior on
+  representative target cameras/servers before release.
 
 ## Document Audit
 

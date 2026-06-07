@@ -4,6 +4,7 @@
 
 #include <QTemporaryDir>
 
+#include <algorithm>
 #include <cmath>
 #include <memory>
 #include <vector>
@@ -22,6 +23,7 @@ private slots:
     void testInvalidSpeedFallsBackToNormalRate();
     void testMissingFileReportsError();
     void testOpenCvStreamProducesLatestFramesAndStatus();
+    void testStreamEofSchedulesReconnectAndRestoresFrames();
     void testMissingStreamReportsError();
 };
 
@@ -262,6 +264,48 @@ void TestVideoInputService::testOpenCvStreamProducesLatestFramesAndStatus()
     service.closeStream();
     QCOMPARE(service.streamStatus(), VideoInputService::StreamStatus::Disconnected);
     QVERIFY(statusSpy.size() >= 2);
+}
+
+void TestVideoInputService::testStreamEofSchedulesReconnectAndRestoresFrames()
+{
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    const QString path = makeTestVideoOrEmpty(dir);
+    if (path.isEmpty()) {
+        QSKIP("OpenCV VideoWriter could not create the test AVI in this environment.");
+    }
+
+    VideoInputService service;
+    std::vector<std::shared_ptr<ImageBuffer>> frames;
+    std::vector<VideoInputService::StreamStatus> statuses;
+    connect(&service, &VideoInputService::frameReady, this,
+            [&frames](std::shared_ptr<ImageBuffer> frame) {
+                frames.push_back(std::move(frame));
+            });
+    connect(&service, &VideoInputService::streamStatusChanged, this,
+            [&statuses](VideoInputService::StreamStatus status) {
+                statuses.push_back(status);
+            });
+
+    QVERIFY(service.openStream(path));
+    QTRY_VERIFY_WITH_TIMEOUT(!frames.empty(), 1500);
+
+    QTRY_COMPARE_WITH_TIMEOUT(service.streamStatus(),
+                              VideoInputService::StreamStatus::Reconnecting,
+                              2500);
+    QVERIFY(std::find(statuses.begin(), statuses.end(),
+                      VideoInputService::StreamStatus::Disconnected) != statuses.end());
+    QVERIFY(std::find(statuses.begin(), statuses.end(),
+                      VideoInputService::StreamStatus::Reconnecting) != statuses.end());
+
+    const std::size_t framesBeforeReconnect = frames.size();
+    QTRY_COMPARE_WITH_TIMEOUT(service.streamStatus(),
+                              VideoInputService::StreamStatus::Connected,
+                              5000);
+    QTRY_VERIFY_WITH_TIMEOUT(frames.size() > framesBeforeReconnect, 1500);
+
+    service.closeStream();
+    QCOMPARE(service.streamStatus(), VideoInputService::StreamStatus::Disconnected);
 }
 
 void TestVideoInputService::testMissingStreamReportsError()

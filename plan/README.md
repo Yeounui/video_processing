@@ -16,7 +16,7 @@ requirements.
 | --- | --- | --- | --- |
 | [[README]] | generated | Current status, document map, source evidence, and open questions. | Review generated status and source evidence. |
 | [[OVERVIEW]] | generated | Goal, scope, non-goals, and constraints. | Review scope before implementation. |
-| [[PHASES]] | generated | Suggested implementation order and phase gates. | Continue Phase 5 runtime backend fallback work. |
+| [[PHASES]] | generated | Suggested implementation order and phase gates. | Continue Phase 6 dependency cleanup planning. |
 | [[ARCHITECTURE]] | generated | Qt/OpenCV boundary, data model, algorithm stack model, and required specs. | Keep backend selection and fallback rules current. |
 | [[DECISIONS]] | generated | Decisions extracted from current plan notes and existing code behavior. | Add decisions as migration behavior changes. |
 | [[REVIEW]] | generated | Parity, QA, benchmark, and regression policy. | Turn acceptance cases into tests/manual checks. |
@@ -59,8 +59,14 @@ requirements.
 - Local generated-AVI stream coverage verifies OpenCV producer frame delivery
   plus `Connected` and `Disconnected` stream statuses. Missing stream coverage
   verifies error reporting.
-- RTSP/HTTP target stream timeout, reconnect, and error-status validation still
-  need real target-environment coverage.
+- Local generated-AVI stream coverage also verifies EOF-driven
+  `Disconnected`/`Reconnecting`/`Connected` status transitions and frame
+  recovery after reconnect.
+- RTSP/HTTP target stream timeout, reconnect, and error-status validation are
+  release/target-environment validation items rather than remaining Phase 4
+  implementation blockers.
+- Phase 4 implementation and automated coverage are verified; target stream
+  validation remains release validation.
 - The current public image boundary is `ImageBuffer`.
 - OpenCV 4.13.0 is found in the `videoprocess` Conda environment for `core`,
   `imgproc`, `imgcodecs`, and `videoio`.
@@ -86,10 +92,16 @@ requirements.
   checking `QQuickWindow::graphicsApi()` through the backend helper.
 - `qt_ui --startup-check` is a hidden smoke-check path that creates
   `QGuiApplication`, records the startup accelerated runtime probe, verifies
-  QML module loading, and exits with `0` before entering the event loop.
+  QML module loading, prints `processing-backend=<cpu-reference|opengl>` to
+  stdout, and exits with `0` before entering the event loop.
 - CTest `qt_ui_cpu_reference_startup` runs the startup smoke with
   `QT_QPA_PLATFORM=offscreen`, `QT_UI_PROCESSING_BACKEND=cpu-reference`, and
-  `QSG_RHI_BACKEND=software`.
+  `QT_QUICK_BACKEND=software`.
+- CTest `qt_ui_software_startup_uses_cpu_reference` runs the startup smoke
+  with software Qt Quick rendering and asserts stdout contains
+  `processing-backend=cpu-reference`.
+- Phase 5 implementation and automated coverage are verified; representative
+  hardware/platform validation remains release validation.
 - CPU-applied effect-stack entries compute `stat_*` parameters from the current
   prefix image before applying statistics-dependent algorithms, preserving the
   CPU-statistics contract for hybrid CPU/GPU stacks.
@@ -224,7 +236,7 @@ requirements.
   probe, verifies QML module loading, and returns `0` before the event loop.
   CTest `qt_ui_cpu_reference_startup` runs `qt_ui --startup-check` with
   `QT_QPA_PLATFORM=offscreen`, `QT_UI_PROCESSING_BACKEND=cpu-reference`, and
-  `QSG_RHI_BACKEND=software`. `tst_ProcessingController` also covers the
+  `QT_QUICK_BACKEND=software`. `tst_ProcessingController` also covers the
   graphics API availability matrix and env/probe priority. `.codex/hooks/run-in-conda.sh
   cmake --build build` passed, `.codex/hooks/run-in-conda.sh ctest --test-dir
   build --output-on-failure` passed with `6/6` tests, and `git diff --check`
@@ -239,6 +251,16 @@ requirements.
   `.codex/hooks/run-in-conda.sh ctest --test-dir build --output-on-failure`
   passed. Direct FFmpeg build dependencies and `x264_compat` references remain
   for Phase 6 cleanup.
+- 2026-06-07: Phase 4 and Phase 5 automated implementation coverage was
+  completed. `tst_VideoInputService` covers OpenCV stream EOF reconnect status
+  transitions (`Disconnected` -> `Reconnecting` -> `Connected`) and frame
+  recovery after reconnect. `qt_ui --startup-check` now prints
+  `processing-backend=<cpu-reference|opengl>`, and CTest
+  `qt_ui_software_startup_uses_cpu_reference` verifies software Qt Quick
+  startup selects `cpu-reference`. `tst_ProcessingController` covers
+  `QT_QUICK_BACKEND=software` and non-OpenGL `QSG_RHI_BACKEND` values such as
+  `vulkan` selecting the CPU reference backend. `cmake --build build` passed,
+  and `ctest --test-dir build --output-on-failure` passed with `7/7` tests.
 
 ## Source Evidence
 
@@ -260,8 +282,9 @@ requirements.
 
 ## Open Questions
 
-- Which RTSP/HTTP target streams still need timeout, reconnect, and status
-  validation after moving stream acquisition to OpenCV `cv::VideoCapture`?
+- Which RTSP/HTTP target streams should be included in release validation for
+  timeout, reconnect, and status behavior after moving stream acquisition to
+  OpenCV `cv::VideoCapture`?
 - When should the remaining direct FFmpeg build dependencies and
   `x264_compat` documentation be removed?
 - Which OpenCV acceleration profile is expected in the target environment:
@@ -269,8 +292,8 @@ requirements.
 - Should initial backend selection add a user-visible setting beyond the
   current environment override, startup Qt Quick graphics API probe, and
   failure-driven downgrade to `CpuReference`?
-- Which target hardware and platform combinations still need validation beyond
-  the offscreen CPU-reference startup smoke for CPU-only or non-OpenGL Qt Quick
-  graphics APIs?
+- Which target hardware and platform combinations should be included in release
+  validation beyond the automated CPU-reference and software Qt Quick startup
+  smoke tests?
 - What are the target performance budgets for static images, video files, and
   real-time streams?

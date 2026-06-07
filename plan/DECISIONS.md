@@ -356,7 +356,9 @@ Consequence: users and tests can force the CPU reference path before any
 accelerated dispatch is attempted. The override controls only the initial
 controller backend; runtime accelerated failures can still downgrade to
 `CpuReference`, and future automatic probing or UI settings need an explicit
-precedence decision before changing this startup contract.
+precedence decision before changing this startup contract. D-023 later extends
+the unset, invalid, `opengl`, and `gl` startup behavior to consult runtime
+accelerated availability before keeping `OpenGl`.
 
 ## D-023: Probe Initial Accelerated Backend Availability At Startup
 
@@ -366,9 +368,13 @@ Decision: keep `QT_UI_PROCESSING_BACKEND=cpu|cpu-reference|cpureference` as a
 hard CPU reference override, but let empty, unset, invalid, `opengl`, and `gl`
 values follow process-level runtime accelerated availability before choosing
 the initial controller backend. `main.cpp` records that availability after
-`QGuiApplication` construction from `QQuickWindow::graphicsApi()`: `Unknown`
-and `OpenGL` are treated as accelerated-runtime available, while explicit
-non-OpenGL graphics APIs are treated as unavailable.
+`QGuiApplication` construction from `QQuickWindow::graphicsApi()` through
+`ProcessingBackend::acceleratedBackendAvailableForGraphicsApi()`: `Unknown`,
+`OpenGL`, and `OpenGLRhi` are treated as accelerated-runtime available, while
+`Software`, `OpenVG`, `Direct3D11`, `Direct3D12`, `Vulkan`, `Metal`, and
+`Null` are treated as unavailable. `QT_QUICK_BACKEND=software` and explicit
+non-OpenGL `QSG_RHI_BACKEND` values also steer startup selection toward
+`CpuReference`.
 
 Reason: the application should avoid dispatching OpenGL accelerated processing
 when Qt Quick is explicitly running on a non-OpenGL graphics API, while still
@@ -390,7 +396,7 @@ The path creates `QGuiApplication`, records the startup accelerated runtime
 probe, verifies QML module loading, and exits with `0` before entering the Qt
 event loop. CTest `qt_ui_cpu_reference_startup` runs this path with
 `QT_QPA_PLATFORM=offscreen`, `QT_UI_PROCESSING_BACKEND=cpu-reference`, and
-`QSG_RHI_BACKEND=software`.
+`QT_QUICK_BACKEND=software`.
 
 Reason: Phase 5 needs evidence that CPU-reference processing can be selected
 through the real application startup path, not only through controller unit
@@ -399,11 +405,12 @@ while giving CI a deterministic way to exercise `QGuiApplication`, startup
 backend probing, and QML module loading without running an interactive event
 loop.
 
-Consequence: full CPU-only application startup coverage is closed at smoke
-level for the offscreen CPU-reference path. Target hardware and platform
-validation remains separate because real rendering, driver behavior, and
-non-OpenGL Qt Quick backends can still vary outside this deterministic smoke
-test.
+Consequence: full CPU-only application startup coverage is closed at automated
+smoke level for the offscreen CPU-reference path. The startup check prints
+`processing-backend=<cpu-reference|opengl>`, allowing CTest to assert backend
+selection. Target hardware and platform validation remains separate release
+validation because real rendering, driver behavior, and non-OpenGL Qt Quick
+backends can still vary outside deterministic smoke tests.
 
 ## D-025: Use OpenCV VideoCapture For Stream Acquisition
 
@@ -422,9 +429,31 @@ consolidate acquisition behind OpenCV while preserving the controller-facing
 reconnect timer, and `StreamStatus` surface limits UI and controller churn
 while replacing the decode backend.
 
-Consequence: deterministic local generated-AVI tests can cover stream producer
-frame delivery and `Connected`/`Disconnected` status transitions, and missing
-stream tests can cover error reporting. RTSP/HTTP timeout, reconnect, and
-status behavior still need target-environment validation before Phase 4 can be
-marked verified. Direct FFmpeg build dependencies and `x264_compat`
-documentation remain Phase 6 cleanup work.
+Consequence: deterministic local generated-AVI tests cover stream producer
+frame delivery, `Connected`/`Disconnected` status transitions, EOF-driven
+`Disconnected`/`Reconnecting`/`Connected` reconnect, and frame recovery after
+reconnect. Missing stream tests cover error reporting. RTSP/HTTP timeout,
+reconnect, and status behavior remain release target-environment validation.
+Direct FFmpeg build dependencies and `x264_compat` documentation remain Phase 6
+cleanup work.
+
+## D-026: Treat Target Stream And Hardware Checks As Release Validation
+
+Status: verified
+
+Decision: mark Phase 4 and Phase 5 implementation plus automated coverage as
+verified once local OpenCV stream reconnect automation, CPU-reference startup
+smoke, software Qt Quick startup backend assertion, and backend selection unit
+tests pass. Keep real RTSP/HTTP stream behavior and real target CPU-only or
+non-OpenGL Qt Quick hardware/platform behavior as release validation items.
+
+Reason: RTSP/HTTP stream behavior and Qt graphics backend behavior vary by
+camera/server, OpenCV backend, driver, operating system, and Qt runtime. The
+project can automate its own selection, timeout, reconnect, status, and startup
+contracts locally, but cannot make local CTest fully representative of every
+target deployment environment.
+
+Consequence: Phase 4 and Phase 5 can be closed without pretending that local
+CTest replaces release validation. Release QA still needs representative
+RTSP/HTTP stream timeout/reconnect/status checks and representative
+CPU-only/non-OpenGL startup/rendering checks before shipping to those targets.

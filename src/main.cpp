@@ -6,6 +6,7 @@
 #include <QQmlApplicationEngine>
 #include <QPointer>
 #include <QQuickWindow>
+#include <QTextStream>
 #include <QTimer>
 
 namespace {
@@ -39,6 +40,18 @@ void applyWslgRuntimeFix()
         qputenv("QSG_RHI_BACKEND", qgetenv("QT_UI_QSG_RHI_BACKEND").isEmpty() ? QByteArray("opengl") : qgetenv("QT_UI_QSG_RHI_BACKEND"));
 }
 
+QString processingBackendName(ProcessingBackend::Kind kind)
+{
+    switch (kind) {
+    case ProcessingBackend::Kind::CpuReference:
+        return QStringLiteral("cpu-reference");
+    case ProcessingBackend::Kind::OpenGl:
+        return QStringLiteral("opengl");
+    }
+
+    return QStringLiteral("unknown");
+}
+
 }
 
 int main(int argc, char *argv[])
@@ -59,8 +72,13 @@ int main(int argc, char *argv[])
     if (engine.rootObjects().isEmpty())
         return -1;
 
-    if (startupCheck)
+    if (startupCheck) {
+        QTextStream(stdout) << "processing-backend="
+                            << processingBackendName(
+                                   ProcessingBackend::defaultKindFromEnvironment())
+                            << '\n';
         return 0;
+    }
 
     if (auto *window = qobject_cast<QQuickWindow *>(engine.rootObjects().constFirst())) {
         window->showNormal();
