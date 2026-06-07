@@ -185,4 +185,9 @@ if(Qt6Test_FOUND AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests")
     )
     add_test(NAME tst_ProcessingController COMMAND tst_ProcessingController)
     set_tests_properties(tst_ProcessingController PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+    add_test(NAME qt_ui_cpu_reference_startup COMMAND qt_ui --startup-check)
+    set_tests_properties(qt_ui_cpu_reference_startup PROPERTIES
+        ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_UI_PROCESSING_BACKEND=cpu-reference;QSG_RHI_BACKEND=software"
+    )
 endif()

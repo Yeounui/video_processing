@@ -1,5 +1,6 @@
 #pragma once
 
+#include <QSGRendererInterface>
 #include <QVariantMap>
 #include <vector>
 
@@ -31,6 +32,8 @@ public:
     static void setRuntimeAcceleratedBackendAvailable(bool available);
     static void clearRuntimeAcceleratedBackendAvailability();
     static bool runtimeAcceleratedBackendAvailable();
+    static bool acceleratedBackendAvailableForGraphicsApi(
+        QSGRendererInterface::GraphicsApi graphicsApi);
     static Kind defaultKindFromEnvironment();
     static StackPlan planVideoStack(const std::vector<Effect> &effects,
                                     Kind kind = Kind::OpenGl);

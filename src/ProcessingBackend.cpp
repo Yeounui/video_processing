@@ -67,6 +67,13 @@ bool ProcessingBackend::runtimeAcceleratedBackendAvailable()
     return runtimeAcceleratedBackendAvailableOverride.value_or(true);
 }
 
+bool ProcessingBackend::acceleratedBackendAvailableForGraphicsApi(
+    QSGRendererInterface::GraphicsApi graphicsApi)
+{
+    return graphicsApi == QSGRendererInterface::Unknown
+        || graphicsApi == QSGRendererInterface::OpenGL;
+}
+
 ProcessingBackend::Kind ProcessingBackend::defaultKindFromEnvironment()
 {
     const QString value = qEnvironmentVariable(kProcessingBackendEnv).trimmed().toLower();

@@ -194,11 +194,17 @@ Implementation note:
   `setRuntimeAcceleratedBackendAvailable(bool)`,
   `clearRuntimeAcceleratedBackendAvailability()`, and
   `runtimeAcceleratedBackendAvailable()`.
+- `ProcessingBackend::acceleratedBackendAvailableForGraphicsApi()` defines the
+  Qt Quick graphics API availability matrix used by startup probing. `Unknown`,
+  `OpenGL`, and `OpenGLRhi` are accelerated-runtime available; `Software`,
+  `OpenVG`, `Direct3D11`, `Direct3D12`, `Vulkan`, `Metal`, and `Null` are not.
 - `main.cpp` sets the runtime probe after `QGuiApplication` creation from
-  `QQuickWindow::graphicsApi()`: `Unknown` and `OpenGL` are considered
-  accelerated-runtime available, while explicit non-OpenGL graphics APIs force
-  the startup backend selection toward `CpuReference` unless the environment
-  hard-overrides to CPU already did so.
+  `QQuickWindow::graphicsApi()` through the backend helper, so explicit
+  non-OpenGL graphics APIs force startup backend selection toward
+  `CpuReference` unless the environment hard-overrides to CPU already did so.
+- `main.cpp` supports hidden `--startup-check` for CTest smoke coverage. The
+  path creates `QGuiApplication`, runs the startup accelerated runtime probe,
+  verifies QML module loading, and exits before entering the event loop.
 - `GpuEffectPipeline` keeps the OpenGL execution implementation but delegates
   public support checks to `ProcessingBackend`, so future OpenCV UMat/CUDA
   backends can replace or extend capability planning without exposing OpenCV
@@ -251,9 +257,14 @@ Implementation note:
   verifies `QT_UI_PROCESSING_BACKEND=cpu-reference` disables video GPU suffix
   planning even when runtime acceleration is marked available, so video
   brightness is CPU-applied.
+- `tst_ProcessingController` covers the Qt graphics API availability matrix and
+  env/probe priority for startup backend selection.
+- CTest `qt_ui_cpu_reference_startup` verifies CPU-reference startup smoke by
+  running `qt_ui --startup-check` with `QT_QPA_PLATFORM=offscreen`,
+  `QT_UI_PROCESSING_BACKEND=cpu-reference`, and `QSG_RHI_BACKEND=software`.
 - Phase 5 is not fully verified yet because initial runtime capability
-  behavior still needs target-environment validation and full CPU-only
-  application startup coverage.
+  behavior still needs target hardware/platform validation beyond the offscreen
+  CPU-reference startup smoke.
 
 ## Phase 6: Remove Replaced Dependencies
 

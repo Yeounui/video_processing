@@ -329,8 +329,14 @@ Required rules:
   `opengl`, and `gl` values use the runtime probe instead of bypassing it.
 - `main.cpp` sets the runtime accelerated availability probe after
   `QGuiApplication` creation by reading `QQuickWindow::graphicsApi()`.
-  `Unknown` and `OpenGL` mean accelerated-runtime available; explicit
-  non-OpenGL graphics APIs mean unavailable.
+  The graphics API is interpreted by
+  `ProcessingBackend::acceleratedBackendAvailableForGraphicsApi()`: `Unknown`,
+  `OpenGL`, and `OpenGLRhi` mean accelerated-runtime available, while
+  `Software`, `OpenVG`, `Direct3D11`, `Direct3D12`, `Vulkan`, `Metal`, and
+  `Null` mean unavailable.
+- `qt_ui --startup-check` is a hidden test/smoke path. It creates the
+  application object, records the startup runtime probe, verifies QML module
+  loading, and exits before the Qt event loop.
 - CUDA is not required for application startup.
 - Per-algorithm support is represented as backend capability, not hard-coded UI
   behavior.
@@ -349,6 +355,8 @@ Current controller rules:
   `setRuntimeAcceleratedBackendAvailable(bool)`,
   `clearRuntimeAcceleratedBackendAvailability()`, and
   `runtimeAcceleratedBackendAvailable()`.
+- `ProcessingBackend::acceleratedBackendAvailableForGraphicsApi()` keeps the
+  graphics API availability mapping testable outside `main.cpp`.
 - Static-image accelerated apply stores the algorithm ID, CPU-prepared
   parameter map, previous output image, and output version at dispatch time.
 - `commitGpuResult()` accepts the result only when the pending output pointer

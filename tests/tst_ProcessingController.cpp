@@ -18,6 +18,9 @@ private slots:
     void testGpuFusedStackSupport();
     void testProcessingBackendPlansAcceleratedSuffix();
     void testProcessingBackendCpuReferenceDisablesAcceleration();
+    void testProcessingBackendGraphicsApiAvailability();
+    void testProcessingBackendRuntimeProbeKeepsOpenGlWhenAvailable();
+    void testProcessingBackendInvalidEnvironmentFollowsRuntimeProbe();
     void testMedianGpuAndHybridSuffixSupport();
     void testCpuEffectStackComputesStatisticsPerSource();
     void testProcessingBackendRuntimeProbeSelectsCpuReference();
@@ -225,6 +228,45 @@ void TestProcessingController::testProcessingBackendCpuReferenceDisablesAccelera
         1, ProcessingBackend::Kind::CpuReference));
     QVERIFY(!ProcessingBackend::supportsFusedStack(
         gpuSupported, ProcessingBackend::Kind::CpuReference));
+}
+
+void TestProcessingController::testProcessingBackendGraphicsApiAvailability() {
+    QVERIFY(ProcessingBackend::acceleratedBackendAvailableForGraphicsApi(
+        QSGRendererInterface::Unknown));
+    QVERIFY(ProcessingBackend::acceleratedBackendAvailableForGraphicsApi(
+        QSGRendererInterface::OpenGL));
+    QVERIFY(ProcessingBackend::acceleratedBackendAvailableForGraphicsApi(
+        QSGRendererInterface::OpenGLRhi));
+
+    QVERIFY(!ProcessingBackend::acceleratedBackendAvailableForGraphicsApi(
+        QSGRendererInterface::Software));
+    QVERIFY(!ProcessingBackend::acceleratedBackendAvailableForGraphicsApi(
+        QSGRendererInterface::OpenVG));
+    QVERIFY(!ProcessingBackend::acceleratedBackendAvailableForGraphicsApi(
+        QSGRendererInterface::Direct3D11));
+    QVERIFY(!ProcessingBackend::acceleratedBackendAvailableForGraphicsApi(
+        QSGRendererInterface::Direct3D12));
+    QVERIFY(!ProcessingBackend::acceleratedBackendAvailableForGraphicsApi(
+        QSGRendererInterface::Vulkan));
+    QVERIFY(!ProcessingBackend::acceleratedBackendAvailableForGraphicsApi(
+        QSGRendererInterface::Metal));
+    QVERIFY(!ProcessingBackend::acceleratedBackendAvailableForGraphicsApi(
+        QSGRendererInterface::Null));
+}
+
+void TestProcessingController::testProcessingBackendRuntimeProbeKeepsOpenGlWhenAvailable() {
+    EnvVarGuard backendEnv("QT_UI_PROCESSING_BACKEND", "");
+    RuntimeAvailabilityGuard runtimeAvailable(true);
+
+    QCOMPARE(ProcessingBackend::defaultKindFromEnvironment(), ProcessingBackend::Kind::OpenGl);
+}
+
+void TestProcessingController::testProcessingBackendInvalidEnvironmentFollowsRuntimeProbe() {
+    EnvVarGuard backendEnv("QT_UI_PROCESSING_BACKEND", "opengl");
+    RuntimeAvailabilityGuard runtimeUnavailable(false);
+
+    QCOMPARE(ProcessingBackend::defaultKindFromEnvironment(),
+             ProcessingBackend::Kind::CpuReference);
 }
 
 void TestProcessingController::testMedianGpuAndHybridSuffixSupport() {

@@ -380,3 +380,27 @@ attempting and failing accelerated processing when the startup probe marks the
 accelerated runtime unavailable. The probe is still a startup selection signal,
 not full target-environment validation; CPU-only application startup and
 hardware/backend-specific acceptance remain separate Phase 5 evidence.
+
+## D-024: Add Hidden Startup Smoke Check For CPU Reference Backend
+
+Status: verified
+
+Decision: add hidden CLI `--startup-check` for CTest startup smoke coverage.
+The path creates `QGuiApplication`, records the startup accelerated runtime
+probe, verifies QML module loading, and exits with `0` before entering the Qt
+event loop. CTest `qt_ui_cpu_reference_startup` runs this path with
+`QT_QPA_PLATFORM=offscreen`, `QT_UI_PROCESSING_BACKEND=cpu-reference`, and
+`QSG_RHI_BACKEND=software`.
+
+Reason: Phase 5 needs evidence that CPU-reference processing can be selected
+through the real application startup path, not only through controller unit
+tests. A hidden smoke-check CLI keeps the behavior out of the user-facing UI
+while giving CI a deterministic way to exercise `QGuiApplication`, startup
+backend probing, and QML module loading without running an interactive event
+loop.
+
+Consequence: full CPU-only application startup coverage is closed at smoke
+level for the offscreen CPU-reference path. Target hardware and platform
+validation remains separate because real rendering, driver behavior, and
+non-OpenGL Qt Quick backends can still vary outside this deterministic smoke
+test.

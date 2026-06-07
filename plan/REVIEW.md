@@ -160,11 +160,19 @@ Current automated coverage:
   with an empty backend env and runtime acceleration marked unavailable,
   controller construction selects `CpuReference` and brightness applies through
   CPU with no GPU pending state.
+- Qt graphics API availability and env/probe priority are covered in
+  `tst_ProcessingController`. `Unknown`, `OpenGL`, and `OpenGLRhi` are locked
+  as accelerated-runtime available, while `Software`, `OpenVG`, `Direct3D11`,
+  `Direct3D12`, `Vulkan`, `Metal`, and `Null` are locked as unavailable.
 - Environment-forced CPU-reference video planning is covered by
   `tst_ProcessingController::testProcessingBackendEnvironmentDisablesVideoGpuSuffix`:
   even with runtime acceleration marked available, `QT_UI_PROCESSING_BACKEND=cpu-reference`
   prevents a video brightness effect from producing a GPU suffix and applies
   the result through CPU.
+- CPU-reference application startup smoke is covered by CTest
+  `qt_ui_cpu_reference_startup`, which runs `qt_ui --startup-check` with
+  `QT_QPA_PLATFORM=offscreen`, `QT_UI_PROCESSING_BACKEND=cpu-reference`, and
+  `QSG_RHI_BACKEND=software`.
 - CPU-reference video-stack planning must produce a full CPU prefix and no
   accelerated suffix.
 - Video GPU suffix apply failure handling is covered by
@@ -185,6 +193,9 @@ Manual QA should include:
 - Exercise zoom, pan, split compare, and original/output switching.
 - Confirm transparent rotated corners composite correctly over the viewport
   background.
+- Validate startup and rendering on representative target hardware/platform
+  combinations beyond the offscreen CPU-reference smoke, especially CPU-only
+  and explicit non-OpenGL Qt Quick graphics APIs.
 
 ## Document Audit
 

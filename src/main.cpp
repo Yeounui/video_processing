@@ -1,11 +1,11 @@
 #include "ProcessingBackend.h"
 
+#include <QCoreApplication>
 #include <QFileInfo>
 #include <QGuiApplication>
 #include <QQmlApplicationEngine>
 #include <QPointer>
 #include <QQuickWindow>
-#include <QSGRendererInterface>
 #include <QTimer>
 
 namespace {
@@ -46,10 +46,11 @@ int main(int argc, char *argv[])
     applyWslgRuntimeFix();
 
     QGuiApplication app(argc, argv);
-    const auto graphicsApi = QQuickWindow::graphicsApi();
     ProcessingBackend::setRuntimeAcceleratedBackendAvailable(
-        graphicsApi == QSGRendererInterface::Unknown
-        || graphicsApi == QSGRendererInterface::OpenGL);
+        ProcessingBackend::acceleratedBackendAvailableForGraphicsApi(
+            QQuickWindow::graphicsApi()));
+    const bool startupCheck = QCoreApplication::arguments().contains(
+        QStringLiteral("--startup-check"));
 
     QQmlApplicationEngine engine;
 
@@ -57,6 +58,9 @@ int main(int argc, char *argv[])
 
     if (engine.rootObjects().isEmpty())
         return -1;
+
+    if (startupCheck)
+        return 0;
 
     if (auto *window = qobject_cast<QQuickWindow *>(engine.rootObjects().constFirst())) {
         window->showNormal();

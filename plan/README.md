@@ -69,10 +69,18 @@ requirements.
   `setRuntimeAcceleratedBackendAvailable(bool)`,
   `clearRuntimeAcceleratedBackendAvailability()`, and
   `runtimeAcceleratedBackendAvailable()`.
+- `ProcessingBackend::acceleratedBackendAvailableForGraphicsApi()` maps Qt
+  scene-graph graphics APIs to accelerated backend availability. `Unknown`,
+  `OpenGL`, and `OpenGLRhi` are available; `Software`, `OpenVG`,
+  `Direct3D11`, `Direct3D12`, `Vulkan`, `Metal`, and `Null` are unavailable.
 - `main.cpp` records the startup probe after `QGuiApplication` construction by
-  checking `QQuickWindow::graphicsApi()`: `Unknown` and `OpenGL` are treated as
-  accelerated-runtime available, while an explicit non-OpenGL graphics API is
-  treated as unavailable.
+  checking `QQuickWindow::graphicsApi()` through the backend helper.
+- `qt_ui --startup-check` is a hidden smoke-check path that creates
+  `QGuiApplication`, records the startup accelerated runtime probe, verifies
+  QML module loading, and exits with `0` before entering the event loop.
+- CTest `qt_ui_cpu_reference_startup` runs the startup smoke with
+  `QT_QPA_PLATFORM=offscreen`, `QT_UI_PROCESSING_BACKEND=cpu-reference`, and
+  `QSG_RHI_BACKEND=software`.
 - CPU-applied effect-stack entries compute `stat_*` parameters from the current
   prefix image before applying statistics-dependent algorithms, preserving the
   CPU-statistics contract for hybrid CPU/GPU stacks.
@@ -198,6 +206,20 @@ requirements.
   cmake --build build` passed, `.codex/hooks/run-in-conda.sh ctest --test-dir
   build --output-on-failure` passed with `5/5` tests, and `git diff --check`
   passed.
+- 2026-06-07: CPU-reference startup smoke coverage was added. `ProcessingBackend::acceleratedBackendAvailableForGraphicsApi()`
+  fixes the Qt graphics API availability matrix in unit tests:
+  `Unknown`/`OpenGL`/`OpenGLRhi` are available, while `Software`, `OpenVG`,
+  `Direct3D11`, `Direct3D12`, `Vulkan`, `Metal`, and `Null` are unavailable.
+  `main.cpp` now uses that helper for the startup probe and supports hidden
+  `--startup-check`, which creates `QGuiApplication`, records the runtime
+  probe, verifies QML module loading, and returns `0` before the event loop.
+  CTest `qt_ui_cpu_reference_startup` runs `qt_ui --startup-check` with
+  `QT_QPA_PLATFORM=offscreen`, `QT_UI_PROCESSING_BACKEND=cpu-reference`, and
+  `QSG_RHI_BACKEND=software`. `tst_ProcessingController` also covers the
+  graphics API availability matrix and env/probe priority. `.codex/hooks/run-in-conda.sh
+  cmake --build build` passed, `.codex/hooks/run-in-conda.sh ctest --test-dir
+  build --output-on-failure` passed with `6/6` tests, and `git diff --check`
+  passed.
 
 ## Source Evidence
 
@@ -226,7 +248,8 @@ requirements.
 - Should initial backend selection add a user-visible setting beyond the
   current environment override, startup Qt Quick graphics API probe, and
   failure-driven downgrade to `CpuReference`?
-- Which target environments still need full application startup validation for
-  CPU-only or non-OpenGL Qt Quick graphics APIs?
+- Which target hardware and platform combinations still need validation beyond
+  the offscreen CPU-reference startup smoke for CPU-only or non-OpenGL Qt Quick
+  graphics APIs?
 - What are the target performance budgets for static images, video files, and
   real-time streams?
