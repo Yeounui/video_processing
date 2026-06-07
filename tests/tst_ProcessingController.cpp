@@ -15,6 +15,8 @@ private slots:
     void testProcessingBackendPlansAcceleratedSuffix();
     void testMedianGpuAndHybridSuffixSupport();
     void testCpuEffectStackComputesStatisticsPerSource();
+    void testGpuFailureFallsBackToCpuReference();
+    void testStaleGpuResultDoesNotOverwriteChangedSource();
 };
 
 void TestProcessingController::testOpenImageFromFileUrl() {
@@ -173,6 +175,82 @@ void TestProcessingController::testCpuEffectStackComputesStatisticsPerSource() {
     QCOMPARE(out->data[3], uint8_t{255});
     QCOMPARE(out->data[4], uint8_t{255});
     QCOMPARE(out->data[5], uint8_t{255});
+}
+
+void TestProcessingController::testGpuFailureFallsBackToCpuReference() {
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    const QString path = dir.filePath(QStringLiteral("gpu_fallback.png"));
+
+    QImage source(1, 1, QImage::Format_RGB888);
+    source.setPixelColor(0, 0, QColor(10, 20, 30));
+    QVERIFY(source.save(path));
+
+    ProcessingController controller;
+    controller.openImage(QUrl::fromLocalFile(path));
+    QVERIFY(controller.hasImage());
+
+    controller.applyAlgorithm(1, QVariantMap{{QStringLiteral("delta"), 15}});
+    QVERIFY(controller.gpuApplyPending());
+
+    controller.cancelGpuApply();
+    QVERIFY(!controller.gpuApplyPending());
+
+    const auto out = controller.outImage();
+    QVERIFY(out != nullptr);
+    QCOMPARE(out->width, 1);
+    QCOMPARE(out->height, 1);
+    QCOMPARE(out->channels, 3);
+    QVERIFY(out->data.size() >= 3);
+    QCOMPARE(out->data[0], uint8_t{25});
+    QCOMPARE(out->data[1], uint8_t{35});
+    QCOMPARE(out->data[2], uint8_t{45});
+    QCOMPARE(controller.historyLabels(), QStringList({QStringLiteral("Brightness")}));
+    QCOMPARE(controller.historyIndex(), 0);
+}
+
+void TestProcessingController::testStaleGpuResultDoesNotOverwriteChangedSource() {
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    const QString firstPath = dir.filePath(QStringLiteral("first.png"));
+    const QString secondPath = dir.filePath(QStringLiteral("second.png"));
+
+    QImage first(1, 1, QImage::Format_RGB888);
+    first.setPixelColor(0, 0, QColor(10, 20, 30));
+    QVERIFY(first.save(firstPath));
+
+    QImage second(1, 1, QImage::Format_RGB888);
+    second.setPixelColor(0, 0, QColor(70, 80, 90));
+    QVERIFY(second.save(secondPath));
+
+    ProcessingController controller;
+    controller.openImage(QUrl::fromLocalFile(firstPath));
+    QVERIFY(controller.hasImage());
+
+    controller.applyAlgorithm(1, QVariantMap{{QStringLiteral("delta"), 120}});
+    QVERIFY(controller.gpuApplyPending());
+
+    controller.openImage(QUrl::fromLocalFile(secondPath));
+    QVERIFY(!controller.gpuApplyPending());
+
+    auto staleResult = std::make_shared<ImageBuffer>();
+    staleResult->width = 1;
+    staleResult->height = 1;
+    staleResult->channels = 3;
+    staleResult->data = {200, 210, 220};
+    controller.commitGpuResult(staleResult);
+
+    const auto out = controller.outImage();
+    QVERIFY(out != nullptr);
+    QCOMPARE(out->width, 1);
+    QCOMPARE(out->height, 1);
+    QCOMPARE(out->channels, 3);
+    QVERIFY(out->data.size() >= 3);
+    QCOMPARE(out->data[0], uint8_t{70});
+    QCOMPARE(out->data[1], uint8_t{80});
+    QCOMPARE(out->data[2], uint8_t{90});
+    QVERIFY(controller.historyLabels().isEmpty());
+    QCOMPARE(controller.historyIndex(), -1);
 }
 
 QTEST_MAIN(TestProcessingController)

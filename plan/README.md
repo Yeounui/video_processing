@@ -62,6 +62,11 @@ requirements.
 - CPU-applied effect-stack entries compute `stat_*` parameters from the current
   prefix image before applying statistics-dependent algorithms, preserving the
   CPU-statistics contract for hybrid CPU/GPU stacks.
+- Static-image accelerated apply requests now record the source output version
+  used for dispatch. Late accelerated results are ignored if the controller
+  source/output changed before completion.
+- Static-image accelerated failures fall back to the CPU reference path when
+  the pending request still matches the current output image.
 - Plan documents are intended to be tracked through the `.gitignore`
   exception for `plan/*.md`.
 
@@ -105,6 +110,12 @@ requirements.
   per-frame `stat_*` parameters for statistics-dependent effects before
   dispatching OpenCV CPU algorithms. `cmake --build build` and
   `ctest --test-dir build --output-on-failure` passed after the change.
+- 2026-06-07: Static-image accelerated apply state now tracks the requested
+  output version, rejects stale completions after source/output changes, and
+  falls back to the OpenCV CPU reference implementation on accelerated failure
+  when the request is still current. `.codex/hooks/run-in-conda.sh cmake
+  --build build` and `.codex/hooks/run-in-conda.sh ctest --test-dir build
+  --output-on-failure` passed after the change.
 
 ## Source Evidence
 

@@ -130,6 +130,8 @@ private:
     void pushCommand(std::unique_ptr<EditCommand> command, const QString &label);
     QString algorithmLabel(int algorithmId) const;
     QStringList visibleHistoryLabels() const;
+    void clearGpuApplyState();
+    bool pendingGpuApplyMatchesCurrentOutput() const;
     int videoGpuSuffixStartIndex() const;
     // Apply effectStack_ to src sequentially; returns result or src if stack is empty.
     std::shared_ptr<ImageBuffer> applyEffectStack(std::shared_ptr<ImageBuffer> src);
@@ -151,6 +153,9 @@ private:
     bool gpuApplyPending_ = false;
     std::shared_ptr<ImageBuffer> gpuPrevOut_;
     QString gpuPendingLabel_;
+    int gpuPendingAlgorithmId_ = 0;
+    QVariantMap gpuPendingParams_;
+    quint64 gpuPendingOutVersion_ = 0;
 
     // Video
     VideoInputService *videoService_ = nullptr;

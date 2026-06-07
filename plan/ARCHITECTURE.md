@@ -325,6 +325,17 @@ Required rules:
 - Display-only video suffixes should avoid CPU readback where the backend and
   viewport boundary permit it.
 
+Current controller rules:
+
+- Static-image accelerated apply stores the algorithm ID, CPU-prepared
+  parameter map, previous output image, and output version at dispatch time.
+- `commitGpuResult()` accepts the result only when the pending output pointer
+  and version still match the current controller output.
+- `cancelGpuApply()` treats accelerated failure as a CPU-reference fallback
+  when the pending request is still current; stale failures are discarded.
+- Source changes, reset, undo, redo, and direct output replacement invalidate
+  any pending static-image accelerated request.
+
 ## Viewport Boundary
 
 The viewport remains Qt-owned:

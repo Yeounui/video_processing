@@ -195,8 +195,15 @@ Implementation note:
   prefix image immediately before `ImageProcessorCore::apply()`, so stacks such
   as `Brightness -> Average Threshold -> accelerated suffix` use frame-local
   statistics before handing the remaining suffix to the accelerated path.
+- Static-image accelerated apply records the output-image version and previous
+  output pointer used for dispatch. A later commit is accepted only if that
+  pending request still matches the current controller output.
+- If static-image accelerated execution fails while the pending request is
+  still current, the controller applies the same algorithm and CPU-computed
+  parameters through the CPU reference implementation, records normal history,
+  and leaves the image unchanged only if the CPU fallback also fails.
 - Phase 5 is not fully verified yet because runtime backend selection,
-  accelerated-failure fallback, and CPU-only startup coverage still need
+  runtime capability detection, and CPU-only startup coverage still need
   explicit acceptance tests.
 
 ## Phase 6: Remove Replaced Dependencies

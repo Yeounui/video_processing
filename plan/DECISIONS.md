@@ -279,3 +279,21 @@ Consequence: hybrid stacks keep statistics on CPU even when a later suffix runs
 on an accelerated backend. If a future backend supports a statistics-dependent
 algorithm directly, the backend planner must still arrange CPU statistic
 computation before dispatch.
+
+## D-019: Guard Static Accelerated Results With Controller Versions
+
+Status: verified
+
+Decision: static-image accelerated apply records the output image pointer,
+output version, algorithm ID, CPU-prepared parameters, and history label at
+dispatch time. A later accelerated completion is accepted only if that pending
+request still matches the current controller output.
+
+Reason: OpenGL execution completes asynchronously through the viewport render
+path. The user can change source, reset, undo, or redo before the queued result
+returns, so accepting a late result would corrupt the current controller state.
+
+Consequence: source/output mutations invalidate pending accelerated work.
+Accelerated failure falls back to `ImageProcessorCore::apply()` only when the
+pending request is still current; stale completions and stale failures are
+discarded without changing the new source or appending history.

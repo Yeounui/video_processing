@@ -239,6 +239,10 @@ quint64 ProcessingController::outImageVersion() const
 
 void ProcessingController::setOutImageDirect(std::shared_ptr<ImageBuffer> img)
 {
+    if (gpuApplyPending_) {
+        clearGpuApplyState();
+    }
+
     outImage_ = std::move(img);
     ++outImageVersion_;
     emit imageChanged();
@@ -260,6 +264,8 @@ void ProcessingController::openImage(const QUrl &url)
         emit errorOccurred(QString("Failed to load image: %1").arg(path));
         return;
     }
+
+    clearGpuApplyState();
 
     // Load succeeded, now update state
     inImage_ = newBuf;
@@ -341,6 +347,7 @@ void ProcessingController::openVideo(const QUrl &url)
         return;  // errorOccurred already emitted by videoService_
     }
 
+    clearGpuApplyState();
     clearHistory();
     effectStack_.clear();
     effectStackLabels_.clear();
@@ -384,6 +391,7 @@ void ProcessingController::openStream(const QString &url)
         return;
     }
 
+    clearGpuApplyState();
     clearHistory();
     effectStack_.clear();
     effectStackLabels_.clear();
@@ -421,6 +429,7 @@ void ProcessingController::reconnectStream()
 
 void ProcessingController::reset()
 {
+    clearGpuApplyState();
     clearHistory();
 
     if (!inImage_) {
@@ -468,8 +477,11 @@ void ProcessingController::applyAlgorithm(int algorithmId, const QVariantMap &pa
     if (ProcessingBackend::supportsAcceleratedAlgorithm(algorithmId)) {
         gpuPrevOut_ = outImage_;
         gpuPendingLabel_ = algorithmLabel(algorithmId);
+        gpuPendingAlgorithmId_ = algorithmId;
+        gpuPendingParams_ = mutableParams;
+        gpuPendingOutVersion_ = outImageVersion_;
         gpuApplyPending_ = true;
-        emit pendingGpuApply(outImage_, algorithmId, mutableParams);
+        emit pendingGpuApply(outImage_, algorithmId, gpuPendingParams_);
         return;  // async; commitGpuResult() will finish
     }
 
@@ -495,6 +507,7 @@ void ProcessingController::undo()
     if (!canUndo())
         return;
 
+    clearGpuApplyState();
     history_[static_cast<std::size_t>(historyIndex_)]->undo();
     --historyIndex_;
     emit historyChanged();
@@ -505,6 +518,7 @@ void ProcessingController::redo()
     if (!canRedo())
         return;
 
+    clearGpuApplyState();
     ++historyIndex_;
     history_[static_cast<std::size_t>(historyIndex_)]->redo();
     emit historyChanged();
@@ -562,6 +576,24 @@ QStringList ProcessingController::visibleHistoryLabels() const
     return historyLabels_;
 }
 
+void ProcessingController::clearGpuApplyState()
+{
+    gpuApplyPending_ = false;
+    gpuPrevOut_.reset();
+    gpuPendingLabel_.clear();
+    gpuPendingAlgorithmId_ = 0;
+    gpuPendingParams_.clear();
+    gpuPendingOutVersion_ = 0;
+}
+
+bool ProcessingController::pendingGpuApplyMatchesCurrentOutput() const
+{
+    return gpuApplyPending_
+        && gpuPrevOut_
+        && outImage_ == gpuPrevOut_
+        && outImageVersion_ == gpuPendingOutVersion_;
+}
+
 int ProcessingController::videoGpuSuffixStartIndex() const
 {
     if (sourceType_ != SourceType::SOURCE_VIDEO_FILE
@@ -574,12 +606,24 @@ int ProcessingController::videoGpuSuffixStartIndex() const
 
 void ProcessingController::commitGpuResult(std::shared_ptr<ImageBuffer> result)
 {
-    if (!gpuApplyPending_) return;
-    gpuApplyPending_ = false;
+    if (!gpuApplyPending_) {
+        return;
+    }
+
+    if (!result) {
+        cancelGpuApply();
+        return;
+    }
+
+    if (!pendingGpuApplyMatchesCurrentOutput()) {
+        clearGpuApplyState();
+        return;
+    }
+
     const QString label = gpuPendingLabel_.isEmpty() ? QStringLiteral("GPU effect") : gpuPendingLabel_;
-    pushCommand(std::make_unique<StaticApplyCommand>(this, gpuPrevOut_, result, label), label);
-    gpuPrevOut_.reset();
-    gpuPendingLabel_.clear();
+    auto prevOut = gpuPrevOut_;
+    clearGpuApplyState();
+    pushCommand(std::make_unique<StaticApplyCommand>(this, prevOut, result, label), label);
     outImage_ = result;
     ++outImageVersion_;
     emit imageChanged();
@@ -589,9 +633,32 @@ void ProcessingController::commitGpuResult(std::shared_ptr<ImageBuffer> result)
 
 void ProcessingController::cancelGpuApply()
 {
-    gpuApplyPending_ = false;
-    gpuPrevOut_.reset();
-    gpuPendingLabel_.clear();
+    if (!gpuApplyPending_) {
+        return;
+    }
+
+    if (!pendingGpuApplyMatchesCurrentOutput()) {
+        clearGpuApplyState();
+        return;
+    }
+
+    const QString label = gpuPendingLabel_.isEmpty() ? QStringLiteral("GPU effect") : gpuPendingLabel_;
+    auto prevOut = gpuPrevOut_;
+    const int algorithmId = gpuPendingAlgorithmId_;
+    const QVariantMap params = gpuPendingParams_;
+    clearGpuApplyState();
+
+    auto scratch = std::make_shared<ImageBuffer>();
+    if (prevOut && ImageProcessorCore::apply(*prevOut, *scratch, algorithmId, params)) {
+        pushCommand(std::make_unique<StaticApplyCommand>(this, prevOut, scratch, label), label);
+        outImage_ = scratch;
+        ++outImageVersion_;
+        emit imageChanged();
+        emit canSaveChanged();
+        emit historyChanged();
+        return;
+    }
+
     emit errorOccurred(QStringLiteral("GPU effect failed; result unchanged"));
 }
 

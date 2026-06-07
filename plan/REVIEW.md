@@ -83,8 +83,10 @@ Current automated coverage:
   restart, invalid playback-speed fallback, and missing-file error reporting.
 - `tst_ProcessingController` covers the backend suffix planner around rotate
   and statistics-dependent CPU-only algorithms, the current fused GPU support
-  matrix, and CPU effect-stack statistics computed from the current source
-  image rather than the default statistic values.
+  matrix, CPU effect-stack statistics computed from the current source image
+  rather than the default statistic values, CPU fallback after static-image
+  accelerated failure, and stale accelerated-result rejection after source
+  changes.
 
 ## Video And Stream Acceptance
 
@@ -134,6 +136,13 @@ Acceleration review must cover:
 - Fully accelerated display-time stacks with no unnecessary readback when the
   architecture supports it.
 - Stale result rejection when source image/version changes mid-flight.
+
+Current automated coverage:
+
+- Static-image GPU failure is simulated through the controller API and must
+  apply the same algorithm through the CPU reference path with normal history.
+- Static-image stale GPU completion is simulated after opening a different
+  source and must not overwrite the new source or append history.
 
 ## Manual QA
 
