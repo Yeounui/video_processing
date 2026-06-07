@@ -150,6 +150,11 @@ Current automated coverage:
 - CPU-reference backend selection is simulated through the controller API and
   must bypass static accelerated dispatch for algorithms that the OpenGL path
   otherwise supports.
+- Environment-forced CPU-reference startup is covered by
+  `tst_ProcessingController::testProcessingBackendEnvironmentSelectsCpuReference`:
+  an environment RAII guard sets `QT_UI_PROCESSING_BACKEND=cpu-reference`,
+  controller construction selects `CpuReference`, and brightness applies
+  through CPU with no GPU pending state and normal history.
 - CPU-reference video-stack planning must produce a full CPU prefix and no
   accelerated suffix.
 - Video GPU suffix apply failure handling is covered by

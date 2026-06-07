@@ -96,6 +96,7 @@ QString StaticApplyCommand::label() const
 ProcessingController::ProcessingController(QObject *parent)
     : QObject(parent)
     , algorithmModel_(std::make_unique<AlgorithmModel>(this))
+    , acceleratedBackendKind_(ProcessingBackend::defaultKindFromEnvironment())
 {
 }
 

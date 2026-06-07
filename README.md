@@ -81,6 +81,8 @@ cmake --build build --target qt_ui
 
 WSLg/Wayland 환경에서는 `QT_UI_WSLG_RUNTIME_DIR`, `QT_UI_QPA_PLATFORM`, `QT_UI_QSG_RHI_BACKEND` 환경변수를 사용해 `XDG_RUNTIME_DIR`, `QT_QPA_PLATFORM`, `QSG_RHI_BACKEND`를 보정합니다.
 
+GPU 처리 경로를 쓰지 않으려면 `QT_UI_PROCESSING_BACKEND=cpu-reference`로 실행하면 됩니다. 이 값은 시작 시 처리 백엔드를 CPU Reference로 고정합니다.
+
 ## 사용 방법
 
 - `Open Image`: 이미지 파일 열기

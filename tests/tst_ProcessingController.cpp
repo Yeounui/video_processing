@@ -20,6 +20,7 @@ private slots:
     void testProcessingBackendCpuReferenceDisablesAcceleration();
     void testMedianGpuAndHybridSuffixSupport();
     void testCpuEffectStackComputesStatisticsPerSource();
+    void testProcessingBackendEnvironmentSelectsCpuReference();
     void testCpuReferenceBackendBypassesStaticGpu();
     void testGpuFailureFallsBackToCpuReference();
     void testVideoGpuSuffixFailureNotificationDisablesVideoGpu();
@@ -27,6 +28,31 @@ private slots:
 };
 
 namespace {
+class EnvVarGuard {
+public:
+    EnvVarGuard(const char *name, const QByteArray &value)
+        : name_(name)
+        , hadPrevious_(qEnvironmentVariableIsSet(name))
+        , previous_(qgetenv(name))
+    {
+        qputenv(name_, value);
+    }
+
+    ~EnvVarGuard()
+    {
+        if (hadPrevious_) {
+            qputenv(name_, previous_);
+        } else {
+            qunsetenv(name_);
+        }
+    }
+
+private:
+    const char *name_ = nullptr;
+    bool hadPrevious_ = false;
+    QByteArray previous_;
+};
+
 bool writeControllerTestVideo(const QString &path)
 {
     cv::VideoWriter writer(path.toUtf8().toStdString(),
@@ -221,6 +247,38 @@ void TestProcessingController::testCpuEffectStackComputesStatisticsPerSource() {
     QCOMPARE(out->data[3], uint8_t{255});
     QCOMPARE(out->data[4], uint8_t{255});
     QCOMPARE(out->data[5], uint8_t{255});
+}
+
+void TestProcessingController::testProcessingBackendEnvironmentSelectsCpuReference() {
+    EnvVarGuard backendEnv("QT_UI_PROCESSING_BACKEND", "cpu-reference");
+
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    const QString path = dir.filePath(QStringLiteral("env_cpu_only.png"));
+
+    QImage source(1, 1, QImage::Format_RGB888);
+    source.setPixelColor(0, 0, QColor(10, 20, 30));
+    QVERIFY(source.save(path));
+
+    ProcessingController controller;
+    QCOMPARE(controller.acceleratedBackendKind(), ProcessingBackend::Kind::CpuReference);
+    controller.openImage(QUrl::fromLocalFile(path));
+    QVERIFY(controller.hasImage());
+
+    controller.applyAlgorithm(1, QVariantMap{{QStringLiteral("delta"), 15}});
+    QVERIFY(!controller.gpuApplyPending());
+
+    const auto out = controller.outImage();
+    QVERIFY(out != nullptr);
+    QCOMPARE(out->width, 1);
+    QCOMPARE(out->height, 1);
+    QCOMPARE(out->channels, 3);
+    QVERIFY(out->data.size() >= 3);
+    QCOMPARE(out->data[0], uint8_t{25});
+    QCOMPARE(out->data[1], uint8_t{35});
+    QCOMPARE(out->data[2], uint8_t{45});
+    QCOMPARE(controller.historyLabels(), QStringList({QStringLiteral("Brightness")}));
+    QCOMPARE(controller.historyIndex(), 0);
 }
 
 void TestProcessingController::testCpuReferenceBackendBypassesStaticGpu() {

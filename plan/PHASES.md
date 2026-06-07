@@ -184,6 +184,11 @@ Implementation note:
 - `ProcessingBackend` now centralizes the current OpenGL accelerated support
   matrix, fused-stack eligibility, statistics-dependency reporting, and
   CPU-prefix/accelerated-suffix planning for video stacks.
+- `ProcessingBackend::defaultKindFromEnvironment()` initializes the processing
+  backend from `QT_UI_PROCESSING_BACKEND` when a `ProcessingController` is
+  constructed. `cpu`, `cpu-reference`, and `cpureference` force
+  `CpuReference`; unset, invalid, `opengl`, and `gl` preserve the default
+  `OpenGl` backend.
 - `GpuEffectPipeline` keeps the OpenGL execution implementation but delegates
   public support checks to `ProcessingBackend`, so future OpenCV UMat/CUDA
   backends can replace or extend capability planning without exposing OpenCV
@@ -224,9 +229,14 @@ Implementation note:
   controller to `CpuReference`, `videoEffectStackUsesGpu()` becomes `false`,
   the suffix is empty, and the CPU-applied result is reflected on the current
   frame.
+- `tst_ProcessingController::testProcessingBackendEnvironmentSelectsCpuReference`
+  verifies the environment override by constructing a controller with
+  `QT_UI_PROCESSING_BACKEND=cpu-reference`, confirming the initial backend is
+  `CpuReference`, and applying brightness through CPU without GPU pending
+  state.
 - Phase 5 is not fully verified yet because initial runtime capability
-  detection, startup backend probing, and full CPU-only application startup
-  coverage still need explicit acceptance tests.
+  detection, automatic startup backend probing, and full CPU-only application
+  startup coverage still need explicit acceptance tests.
 
 ## Phase 6: Remove Replaced Dependencies
 

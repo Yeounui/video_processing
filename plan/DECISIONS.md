@@ -336,3 +336,24 @@ failure is reported from `ProcessingViewportItem` to the controller and causes
 the same downgrade. After downgrade, GPU-supported static algorithms apply
 synchronously through CPU and video stack planning produces no accelerated
 suffix until a future decision adds re-enable or probing behavior.
+
+## D-022: Allow Environment-Controlled Initial Processing Backend
+
+Status: verified
+
+Decision: `ProcessingBackend::defaultKindFromEnvironment()` reads
+`QT_UI_PROCESSING_BACKEND` when `ProcessingController` is constructed. Values
+`cpu`, `cpu-reference`, and `cpureference` select
+`ProcessingBackend::Kind::CpuReference`; unset, invalid, `opengl`, and `gl`
+preserve the existing default `ProcessingBackend::Kind::OpenGl`.
+
+Reason: Phase 5 needs a practical startup override for CPU-only or unreliable
+accelerated environments before automatic capability probing and a user-visible
+setting are designed. An environment variable is easy to document, test, and
+use in CI or local troubleshooting without changing QML-facing APIs.
+
+Consequence: users and tests can force the CPU reference path before any
+accelerated dispatch is attempted. The override controls only the initial
+controller backend; runtime accelerated failures can still downgrade to
+`CpuReference`, and future automatic probing or UI settings need an explicit
+precedence decision before changing this startup contract.

@@ -59,6 +59,10 @@ requirements.
 - Current video stack optimization uses a CPU prefix plus GPU suffix model.
 - `ProcessingBackend` now owns accelerated support reporting, fused-stack
   eligibility, and CPU-prefix/accelerated-suffix planning for video stacks.
+- `ProcessingBackend::defaultKindFromEnvironment()` reads
+  `QT_UI_PROCESSING_BACKEND` during controller construction. Values `cpu`,
+  `cpu-reference`, and `cpureference` force `CpuReference`; unset, invalid,
+  `opengl`, and `gl` keep the existing default `OpenGl`.
 - CPU-applied effect-stack entries compute `stat_*` parameters from the current
   prefix image before applying statistics-dependent algorithms, preserving the
   CPU-statistics contract for hybrid CPU/GPU stacks.
@@ -83,6 +87,9 @@ requirements.
   brightness as an accelerated suffix candidate, direct viewport failure
   notification, backend downgrade, empty GPU suffix, and CPU-applied frame
   output after downgrade.
+- `.env.example` and root `README.md` document
+  `QT_UI_PROCESSING_BACKEND=cpu-reference` as the startup override for forcing
+  CPU reference processing.
 - Plan documents are intended to be tracked through the `.gitignore`
   exception for `plan/*.md`.
 
@@ -157,6 +164,16 @@ requirements.
   `WrapVulkanHeaders` warnings, `.codex/hooks/run-in-conda.sh ctest --test-dir
   build --output-on-failure` passed with `5/5` tests, and `git diff --check`
   passed.
+- 2026-06-07: Initial backend environment override was added through
+  `ProcessingBackend::defaultKindFromEnvironment()` and
+  `QT_UI_PROCESSING_BACKEND`. `tst_ProcessingController::testProcessingBackendEnvironmentSelectsCpuReference`
+  uses an environment RAII guard with `QT_UI_PROCESSING_BACKEND=cpu-reference`,
+  constructs a controller, verifies the initial backend is
+  `ProcessingBackend::Kind::CpuReference`, and confirms brightness applies
+  synchronously through CPU with no GPU pending state and normal history.
+  `.codex/hooks/run-in-conda.sh cmake --build build` passed,
+  `.codex/hooks/run-in-conda.sh ctest --test-dir build --output-on-failure`
+  passed with `5/5` tests, and `git diff --check` passed.
 
 ## Source Evidence
 
@@ -182,8 +199,8 @@ requirements.
   satisfy stream timeout, reconnect, or metadata requirements?
 - Which OpenCV acceleration profile is expected in the target environment:
   CPU-only, OpenCL/UMat, CUDA, or multiple runtime-selectable backends?
-- Should initial backend selection become a user-visible setting, an
-  environment override, or an automatic startup probe beyond the current
-  failure-driven downgrade to `CpuReference`?
+- Should initial backend selection add a user-visible setting or automatic
+  startup probe beyond the current environment override and failure-driven
+  downgrade to `CpuReference`?
 - What are the target performance budgets for static images, video files, and
   real-time streams?

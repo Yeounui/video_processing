@@ -1,8 +1,11 @@
 #include "ProcessingBackend.h"
 
+#include <QString>
 #include <algorithm>
 
 namespace {
+constexpr auto kProcessingBackendEnv = "QT_UI_PROCESSING_BACKEND";
+
 bool containsAlgorithm(const int *begin, const int *end, int algorithmId)
 {
     return std::find(begin, end, algorithmId) != end;
@@ -45,6 +48,18 @@ bool ProcessingBackend::supportsFusedStack(const std::vector<Effect> &effects, K
 bool ProcessingBackend::requiresCpuStatistics(int algorithmId)
 {
     return algorithmId == 5 || algorithmId == 10 || algorithmId == 23;
+}
+
+ProcessingBackend::Kind ProcessingBackend::defaultKindFromEnvironment()
+{
+    const QString value = qEnvironmentVariable(kProcessingBackendEnv).trimmed().toLower();
+    if (value == QStringLiteral("cpu")
+        || value == QStringLiteral("cpu-reference")
+        || value == QStringLiteral("cpureference")) {
+        return Kind::CpuReference;
+    }
+
+    return Kind::OpenGl;
 }
 
 ProcessingBackend::StackPlan ProcessingBackend::planVideoStack(

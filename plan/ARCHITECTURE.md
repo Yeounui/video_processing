@@ -322,6 +322,9 @@ Required rules:
 
 - CPU is the reference backend.
 - Accelerated backend availability is detected at runtime.
+- `QT_UI_PROCESSING_BACKEND` may force the initial controller backend to
+  `CpuReference` with `cpu`, `cpu-reference`, or `cpureference`; unset,
+  invalid, `opengl`, and `gl` preserve the default `OpenGl` selection.
 - CUDA is not required for application startup.
 - Per-algorithm support is represented as backend capability, not hard-coded UI
   behavior.
@@ -334,6 +337,8 @@ Required rules:
 
 Current controller rules:
 
+- `ProcessingController` initializes its selected backend from
+  `ProcessingBackend::defaultKindFromEnvironment()` during construction.
 - Static-image accelerated apply stores the algorithm ID, CPU-prepared
   parameter map, previous output image, and output version at dispatch time.
 - `commitGpuResult()` accepts the result only when the pending output pointer
