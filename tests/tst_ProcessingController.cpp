@@ -2,8 +2,12 @@
 #include "GpuEffectPipeline.h"
 #include "ProcessingBackend.h"
 #include "ProcessingController.h"
+#include "ProcessingViewportItem.h"
 #include <QImage>
 #include <QTemporaryDir>
+#include <algorithm>
+#include <opencv2/core.hpp>
+#include <opencv2/videoio.hpp>
 
 class TestProcessingController : public QObject {
     Q_OBJECT
@@ -18,8 +22,30 @@ private slots:
     void testCpuEffectStackComputesStatisticsPerSource();
     void testCpuReferenceBackendBypassesStaticGpu();
     void testGpuFailureFallsBackToCpuReference();
+    void testVideoGpuSuffixFailureNotificationDisablesVideoGpu();
     void testStaleGpuResultDoesNotOverwriteChangedSource();
 };
+
+namespace {
+bool writeControllerTestVideo(const QString &path)
+{
+    cv::VideoWriter writer(path.toUtf8().toStdString(),
+                           cv::VideoWriter::fourcc('M', 'J', 'P', 'G'),
+                           5.0,
+                           cv::Size(4, 2),
+                           true);
+    if (!writer.isOpened()) {
+        return false;
+    }
+
+    const cv::Mat frame(2, 4, CV_8UC3, cv::Scalar(10, 20, 30));
+    writer.write(frame);
+    writer.release();
+
+    cv::VideoCapture verifier(path.toUtf8().toStdString());
+    return verifier.isOpened();
+}
+}
 
 void TestProcessingController::testOpenImageFromFileUrl() {
     QTemporaryDir dir;
@@ -276,6 +302,52 @@ void TestProcessingController::testGpuFailureFallsBackToCpuReference() {
     QCOMPARE(controller.historyLabels(),
              QStringList({QStringLiteral("Brightness"), QStringLiteral("Brightness")}));
     QCOMPARE(controller.historyIndex(), 1);
+}
+
+void TestProcessingController::testVideoGpuSuffixFailureNotificationDisablesVideoGpu() {
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    const QString path = dir.filePath(QStringLiteral("video_gpu_fallback.avi"));
+    if (!writeControllerTestVideo(path)) {
+        QSKIP("OpenCV VideoWriter could not create the test AVI in this environment.");
+    }
+
+    ProcessingController controller;
+    controller.openVideo(QUrl::fromLocalFile(path));
+    QVERIFY(controller.isVideoSource());
+    QVERIFY(controller.hasImage());
+    QCOMPARE(controller.acceleratedBackendKind(), ProcessingBackend::Kind::OpenGl);
+
+    const auto original = controller.outImage();
+    QVERIFY(original != nullptr);
+    QCOMPARE(original->channels, 3);
+    QVERIFY(original->data.size() >= 3);
+    const uint8_t originalR = original->data[0];
+    const uint8_t originalG = original->data[1];
+    const uint8_t originalB = original->data[2];
+
+    QVERIFY(controller.appendEffect(1, QVariantMap{{QStringLiteral("delta"), 15}}));
+    QVERIFY(controller.videoEffectStackUsesGpu());
+    const auto suffix = controller.videoGpuEffectSuffix();
+    QCOMPARE(suffix.size(), std::size_t{1});
+    QCOMPARE(suffix.front().algorithmId, 1);
+
+    ProcessingViewportItem viewport;
+    viewport.setController(&controller);
+    viewport.notifyGpuPipelineFailure();
+
+    QCOMPARE(controller.acceleratedBackendKind(), ProcessingBackend::Kind::CpuReference);
+    QVERIFY(!controller.videoEffectStackUsesGpu());
+    QVERIFY(controller.videoGpuEffectSuffix().empty());
+    QCOMPARE(controller.effectStackSize(), 1);
+
+    const auto afterFailure = controller.outImage();
+    QVERIFY(afterFailure != nullptr);
+    QCOMPARE(afterFailure->channels, 3);
+    QVERIFY(afterFailure->data.size() >= 3);
+    QCOMPARE(afterFailure->data[0], static_cast<uint8_t>(std::min(255, originalR + 15)));
+    QCOMPARE(afterFailure->data[1], static_cast<uint8_t>(std::min(255, originalG + 15)));
+    QCOMPARE(afterFailure->data[2], static_cast<uint8_t>(std::min(255, originalB + 15)));
 }
 
 void TestProcessingController::testStaleGpuResultDoesNotOverwriteChangedSource() {

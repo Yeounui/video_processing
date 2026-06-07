@@ -78,6 +78,11 @@ requirements.
 - `ProcessingViewportItem` reports video GPU suffix apply failures back to the
   controller, causing the same `CpuReference` downgrade so later frames stop
   planning an accelerated suffix.
+- `tst_ProcessingController::testVideoGpuSuffixFailureNotificationDisablesVideoGpu`
+  now covers the video failure-notification path with a generated MJPG AVI,
+  brightness as an accelerated suffix candidate, direct viewport failure
+  notification, backend downgrade, empty GPU suffix, and CPU-applied frame
+  output after downgrade.
 - Plan documents are intended to be tracked through the `.gitignore`
   exception for `plan/*.md`.
 
@@ -139,6 +144,17 @@ requirements.
   `ProcessingBackend::Kind::CpuReference`, and a later GPU-supported algorithm
   applying through CPU without emitting new GPU work. `.codex/hooks/run-in-conda.sh
   cmake --build build` passed, `.codex/hooks/run-in-conda.sh ctest --test-dir
+  build --output-on-failure` passed with `5/5` tests, and `git diff --check`
+  passed.
+- 2026-06-07: Video GPU suffix failure notification now has automated
+  controller coverage. `tst_ProcessingController::testVideoGpuSuffixFailureNotificationDisablesVideoGpu`
+  creates a temporary MJPG AVI, opens it through `ProcessingController::openVideo()`,
+  verifies brightness is planned as a video GPU suffix, calls
+  `ProcessingViewportItem::notifyGpuPipelineFailure()`, and verifies downgrade
+  to `ProcessingBackend::Kind::CpuReference`, disabled video GPU usage, empty
+  suffix, and CPU-applied current-frame output. `.codex/hooks/run-in-conda.sh
+  cmake --build build` passed with only the existing Qt policy and
+  `WrapVulkanHeaders` warnings, `.codex/hooks/run-in-conda.sh ctest --test-dir
   build --output-on-failure` passed with `5/5` tests, and `git diff --check`
   passed.
 

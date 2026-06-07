@@ -164,6 +164,8 @@ if(Qt6Test_FOUND AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests")
         src/VideoInputService.cpp
         include/ProcessingController.h
         src/ProcessingController.cpp
+        include/ProcessingViewportItem.h
+        src/ProcessingViewportItem.cpp
         include/ImageProcessorCore.h
         src/ImageProcessorCore.cpp
         include/ProcessingBackend.h
@@ -176,7 +178,7 @@ if(Qt6Test_FOUND AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests")
     target_include_directories(tst_ProcessingController PRIVATE include)
     target_include_directories(tst_ProcessingController PRIVATE "${AVFORMAT_INCLUDE_DIR}")
     target_include_directories(tst_ProcessingController PRIVATE ${OpenCV_INCLUDE_DIRS})
-    target_link_libraries(tst_ProcessingController PRIVATE Qt6::Core Qt6::Gui Qt6::Qml Qt6::OpenGL Qt6::Test ${OpenCV_LIBS} ${AVFORMAT_LIB} ${AVCODEC_LIB} ${AVUTIL_LIB} ${SWSCALE_LIB} x264_compat)
+    target_link_libraries(tst_ProcessingController PRIVATE Qt6::Core Qt6::Gui Qt6::Qml Qt6::Quick Qt6::OpenGL Qt6::Test ${OpenCV_LIBS} ${AVFORMAT_LIB} ${AVCODEC_LIB} ${AVUTIL_LIB} ${SWSCALE_LIB} x264_compat)
     set_target_properties(tst_ProcessingController PROPERTIES
         BUILD_RPATH "${FFMPEG_PREFIX}/lib;${CMAKE_BINARY_DIR}"
         LINK_FLAGS "-Wl,-rpath-link,${FFMPEG_PREFIX}/lib,--allow-shlib-undefined"

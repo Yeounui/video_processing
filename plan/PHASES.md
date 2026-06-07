@@ -217,6 +217,13 @@ Implementation note:
 - `tst_ProcessingController::testGpuFailureFallsBackToCpuReference` verifies
   static GPU failure fallback, backend downgrade to `CpuReference`, and a later
   GPU-supported algorithm applying through CPU without emitting GPU work.
+- `tst_ProcessingController::testVideoGpuSuffixFailureNotificationDisablesVideoGpu`
+  verifies the display-time video suffix failure notification path with a
+  temporary MJPG AVI. It confirms brightness initially plans as a GPU suffix,
+  `ProcessingViewportItem::notifyGpuPipelineFailure()` downgrades the
+  controller to `CpuReference`, `videoEffectStackUsesGpu()` becomes `false`,
+  the suffix is empty, and the CPU-applied result is reflected on the current
+  frame.
 - Phase 5 is not fully verified yet because initial runtime capability
   detection, startup backend probing, and full CPU-only application startup
   coverage still need explicit acceptance tests.

@@ -86,8 +86,9 @@ Current automated coverage:
   matrix, CPU effect-stack statistics computed from the current source image
   rather than the default statistic values, CPU fallback after static-image
   accelerated failure, accelerated-backend downgrade to `CpuReference` after
-  failure, later CPU-only apply for GPU-supported algorithms, and stale
-  accelerated-result rejection after source changes.
+  failure, later CPU-only apply for GPU-supported algorithms, video GPU suffix
+  failure notification with current-frame CPU application after downgrade, and
+  stale accelerated-result rejection after source changes.
 
 ## Video And Stream Acceptance
 
@@ -151,10 +152,12 @@ Current automated coverage:
   otherwise supports.
 - CPU-reference video-stack planning must produce a full CPU prefix and no
   accelerated suffix.
-- Video GPU suffix apply failure handling is implemented through the viewport
-  reporting the failure to the controller; add focused coverage or manual QA
-  evidence before treating display-time suffix failure behavior as fully
-  verified.
+- Video GPU suffix apply failure handling is covered by
+  `tst_ProcessingController::testVideoGpuSuffixFailureNotificationDisablesVideoGpu`:
+  a generated MJPG AVI initially plans brightness as a GPU suffix, direct
+  viewport failure notification downgrades the controller to `CpuReference`,
+  video GPU use is disabled, the suffix is empty, and the current frame reflects
+  the CPU-applied result.
 
 ## Manual QA
 
