@@ -12,7 +12,7 @@ Qt 6 Quick/QML과 C++17로 작성한 이미지/비디오 처리 UI입니다.
 
 - Qt Quick/QML 기반 3패널 UI
 - 정적 이미지 열기, 처리 결과 저장, reset, undo/redo
-- FFmpeg 기반 영상 파일 재생, 일시정지, seek, frame step
+- OpenCV 기반 영상 파일 재생, 일시정지, seek, frame step
 - RTSP/RTMP/HTTP 스트림 열기, reconnect, disconnect
 - 이미지 모드의 직접 편집과 영상/스트림 모드의 effect stack
 - Point, Geometry, Filter, Edge, Morphology, Grayscale 카테고리별 알고리즘 선택
@@ -59,9 +59,7 @@ Qt 6 Quick/QML과 C++17로 작성한 이미지/비디오 처리 UI입니다.
 - CMake 3.16 이상
 - C++17 compiler
 - Qt 6: Core, Gui, Qml, Quick, QuickControls2
-- FFmpeg libraries: `libavformat`, `libavcodec`, `libavutil`, `libswscale`
-
-FFmpeg 경로는 환경변수에서 읽습니다. 로컬에서는 `.env`에 `QT_UI_FFMPEG_PREFIX`를 두고, 다른 환경에서는 `QT_UI_FFMPEG_PREFIX`, `FFMPEG_PREFIX`, 또는 활성화된 Conda의 `CONDA_PREFIX`를 사용하면 됩니다.
+- OpenCV: `core`, `imgproc`, `imgcodecs`, `videoio`
 
 ## 빌드
 

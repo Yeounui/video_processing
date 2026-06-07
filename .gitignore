@@ -1,14 +1,8 @@
 build/
+plan/
 .*/
 .*
 !.gitignore
-.qmlls.ini
-.env
 !.env.example
-__pycache__/
-*.py[cod]
 *.md
 !README.md
-!assets/**/*.md
-!plan/*.md
-ui_template/

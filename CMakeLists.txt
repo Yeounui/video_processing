@@ -1,34 +1,12 @@
 cmake_minimum_required(VERSION 3.16)
 
-project(qt_ui LANGUAGES CXX C)
+project(qt_ui LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 find_package(Qt6 REQUIRED COMPONENTS Core Gui Qml Quick QuickControls2)
 find_package(OpenCV REQUIRED COMPONENTS core imgproc imgcodecs videoio)
-
-# FFmpeg prefix comes from the local shell environment. For this repo, source
-# .env before configuring or build from an activated Conda environment.
-if(DEFINED ENV{QT_UI_FFMPEG_PREFIX})
-    set(FFMPEG_PREFIX "$ENV{QT_UI_FFMPEG_PREFIX}")
-elseif(DEFINED ENV{FFMPEG_PREFIX})
-    set(FFMPEG_PREFIX "$ENV{FFMPEG_PREFIX}")
-elseif(DEFINED ENV{CONDA_PREFIX})
-    set(FFMPEG_PREFIX "$ENV{CONDA_PREFIX}")
-else()
-    message(FATAL_ERROR "Set QT_UI_FFMPEG_PREFIX, FFMPEG_PREFIX, or CONDA_PREFIX before configuring.")
-endif()
-file(TO_CMAKE_PATH "${FFMPEG_PREFIX}" FFMPEG_PREFIX)
-find_path(AVFORMAT_INCLUDE_DIR libavformat/avformat.h HINTS "${FFMPEG_PREFIX}/include" REQUIRED)
-# Use static libraries to avoid transitive dependency issues
-find_library(AVFORMAT_LIB avformat HINTS "${FFMPEG_PREFIX}/lib" REQUIRED)
-find_library(AVCODEC_LIB  avcodec  HINTS "${FFMPEG_PREFIX}/lib" REQUIRED)
-find_library(AVUTIL_LIB   avutil   HINTS "${FFMPEG_PREFIX}/lib" REQUIRED)
-find_library(SWSCALE_LIB  swscale  HINTS "${FFMPEG_PREFIX}/lib" REQUIRED)
-
-# Stub shared lib: provides x264_bit_depth missing from conda videoprocess libx264.so.138
-add_library(x264_compat SHARED src/x264_compat.c)
 
 qt_standard_project_setup()
 
@@ -72,7 +50,6 @@ qt_add_qml_module(qt_ui
 )
 
 target_include_directories(qt_ui PRIVATE include)
-target_include_directories(qt_ui PRIVATE "${AVFORMAT_INCLUDE_DIR}")
 target_include_directories(qt_ui PRIVATE ${OpenCV_INCLUDE_DIRS})
 
 target_link_libraries(qt_ui
@@ -83,13 +60,6 @@ target_link_libraries(qt_ui
         Qt6::Quick
         Qt6::QuickControls2
         ${OpenCV_LIBS}
-        ${AVFORMAT_LIB} ${AVCODEC_LIB} ${AVUTIL_LIB} ${SWSCALE_LIB}
-        x264_compat
-)
-
-set_target_properties(qt_ui PROPERTIES
-    BUILD_RPATH "${FFMPEG_PREFIX}/lib;${CMAKE_BINARY_DIR}"
-    LINK_FLAGS "-Wl,-rpath-link,${FFMPEG_PREFIX}/lib,--allow-shlib-undefined"
 )
 
 # ImageProcessorCore unit tests
@@ -143,13 +113,8 @@ if(Qt6Test_FOUND AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests")
         include/ImageBuffer.h
     )
     target_include_directories(tst_VideoInputService PRIVATE include)
-    target_include_directories(tst_VideoInputService PRIVATE "${AVFORMAT_INCLUDE_DIR}")
     target_include_directories(tst_VideoInputService PRIVATE ${OpenCV_INCLUDE_DIRS})
-    target_link_libraries(tst_VideoInputService PRIVATE Qt6::Core Qt6::Test ${OpenCV_LIBS} ${AVFORMAT_LIB} ${AVCODEC_LIB} ${AVUTIL_LIB} ${SWSCALE_LIB} x264_compat)
-    set_target_properties(tst_VideoInputService PROPERTIES
-        BUILD_RPATH "${FFMPEG_PREFIX}/lib;${CMAKE_BINARY_DIR}"
-        LINK_FLAGS "-Wl,-rpath-link,${FFMPEG_PREFIX}/lib,--allow-shlib-undefined"
-    )
+    target_link_libraries(tst_VideoInputService PRIVATE Qt6::Core Qt6::Test ${OpenCV_LIBS})
     add_test(NAME tst_VideoInputService COMMAND tst_VideoInputService)
 
     qt_add_executable(tst_ProcessingController
@@ -176,13 +141,8 @@ if(Qt6Test_FOUND AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests")
         src/GpuEffectPipeline.cpp
     )
     target_include_directories(tst_ProcessingController PRIVATE include)
-    target_include_directories(tst_ProcessingController PRIVATE "${AVFORMAT_INCLUDE_DIR}")
     target_include_directories(tst_ProcessingController PRIVATE ${OpenCV_INCLUDE_DIRS})
-    target_link_libraries(tst_ProcessingController PRIVATE Qt6::Core Qt6::Gui Qt6::Qml Qt6::Quick Qt6::OpenGL Qt6::Test ${OpenCV_LIBS} ${AVFORMAT_LIB} ${AVCODEC_LIB} ${AVUTIL_LIB} ${SWSCALE_LIB} x264_compat)
-    set_target_properties(tst_ProcessingController PROPERTIES
-        BUILD_RPATH "${FFMPEG_PREFIX}/lib;${CMAKE_BINARY_DIR}"
-        LINK_FLAGS "-Wl,-rpath-link,${FFMPEG_PREFIX}/lib,--allow-shlib-undefined"
-    )
+    target_link_libraries(tst_ProcessingController PRIVATE Qt6::Core Qt6::Gui Qt6::Qml Qt6::Quick Qt6::OpenGL Qt6::Test ${OpenCV_LIBS})
     add_test(NAME tst_ProcessingController COMMAND tst_ProcessingController)
     set_tests_properties(tst_ProcessingController PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 

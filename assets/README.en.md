@@ -12,7 +12,7 @@ This branch provides a Qt UI version of the original `video_processing` project.
 
 - Three-panel Qt Quick/QML desktop UI
 - Open static images, save processed results, reset, undo, and redo
-- FFmpeg-based video playback with pause, seek, and frame stepping
+- OpenCV-based video playback with pause, seek, and frame stepping
 - Open RTSP/RTMP/HTTP streams with reconnect and disconnect support
 - Direct image editing mode and effect stack support for video/stream mode
 - Algorithm browser grouped by Point, Geometry, Filter, Edge, Morphology, and Grayscale
@@ -59,9 +59,7 @@ The application provides 28 image/video processing algorithms.
 - CMake 3.16 or newer
 - C++17 compiler
 - Qt 6: Core, Gui, Qml, Quick, QuickControls2
-- FFmpeg libraries: `libavformat`, `libavcodec`, `libavutil`, `libswscale`
-
-The FFmpeg prefix is read from the environment. Set `QT_UI_FFMPEG_PREFIX`, `FFMPEG_PREFIX`, or use an activated Conda environment with `CONDA_PREFIX`.
+- OpenCV: `core`, `imgproc`, `imgcodecs`, `videoio`
 
 ## Build
 
